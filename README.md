@@ -23,28 +23,33 @@ The easiest way is Docker inside a small Debian container (LXC) or VM.
 
 ### 1. Create the container
 
-In the Proxmox web UI, click **Create CT** and use these settings:
-
-- Template: **Debian 12**
-- Disk: 8 GB
-- CPU: 1 core
-- Memory: 1024 MB
-- Network: DHCP, or a static IP (a static IP is easier to bookmark)
-- On the **Options** tab after it's created, set **Features → Nesting = on** (Docker needs this).
-
-Start the container and open its console.
+1. Download the template: in the Proxmox web UI, click your storage (usually **local**), then **CT Templates → Templates**, pick **debian-12-standard** and click **Download**.
+2. Click **Create CT** and use these settings:
+   - **General:** choose a hostname (e.g. `health`) and a root password. Leave **Unprivileged container** ticked.
+   - **Template:** debian-12-standard
+   - **Disks:** 10 GB
+   - **CPU:** 2 cores
+   - **Memory:** 2048 MB, swap 512 MB (building the app needs the memory; it uses far less once running)
+   - **Network:** bridge `vmbr0`. Use a static IP such as `192.168.1.50/24` with your router as the gateway (e.g. `192.168.1.1`), or DHCP with a reservation in your router.
+   - **DNS:** leave as host settings.
+3. Before starting it, select the container and go to **Options → Features**. Tick **keyctl** and **Nesting** (Docker needs both). Also set **Start at boot** to Yes.
+4. Start the container, open **Console** and log in as `root`.
 
 ### 2. Install Docker and get the app
 
 ```bash
-apt update && apt install -y curl git
+apt update && apt upgrade -y
+apt install -y curl git nano
 curl -fsSL https://get.docker.com | sh
+docker run --rm hello-world      # should print "Hello from Docker!"
 
 git clone https://github.com/JohnKeeg8/food_tracker_app.git
 cd food_tracker_app
 cp .env.example .env
 nano .env        # optional: change settings, then save with Ctrl+O, Enter, Ctrl+X
 ```
+
+If the repository is private, `git clone` asks for a username and password. Enter your GitHub username, and for the password use a **personal access token**, not your GitHub password. To create one, go to GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**. Choose **Only select repositories → food_tracker_app** and give it **Contents: Read-only** permission. To save the token so later `git pull`s don't ask again, run `git config --global credential.helper store` before cloning.
 
 ### 3. Start it
 
