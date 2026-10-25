@@ -67,6 +67,8 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
       fat: str(parsed.fat, v.fat),
     }));
     if (parsed.amount) setAmount(parsed.amount);
+    // Photo answers name the food; keep a name the user already typed.
+    if (parsed.name) setName((current) => (current.trim() ? current : parsed.name!));
     setPasteNote("Filled in from Claude's answer. Check the numbers, then add it.");
   };
 

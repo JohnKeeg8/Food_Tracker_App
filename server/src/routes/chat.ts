@@ -16,11 +16,22 @@ When someone asks about a specific food or meal:
 \`\`\`
 Numbers are plain numbers in kcal and grams. The app turns this block into an "Add to log" button, so only include it when you are describing one specific food or meal.
 
+When given a photo of food, identify the foods, estimate the portion sizes from what you can see, and treat the whole plate as one meal for the nutrition block.
+
 You can also answer general questions about nutrition, hydration, recipes and exercise. You are not a doctor; for medical conditions, suggest talking to a healthcare professional.`;
 
 const chatSchema = z.object({
   messages: z
-    .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(8000) }))
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(8000),
+        // Optional food photo on a user message, base64-encoded (the app resizes photos before sending).
+        image: z
+          .object({ mediaType: z.enum(["image/jpeg", "image/png", "image/webp"]), data: z.string().max(7_000_000) })
+          .optional(),
+      }),
+    )
     .min(1)
     .max(40),
 });
@@ -45,7 +56,17 @@ chatRouter.post("/", async (req, res) => {
       model: config.claudeModel,
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
-      messages: parsed.data.messages,
+      messages: parsed.data.messages.map((m) =>
+        m.image && m.role === "user"
+          ? {
+              role: m.role,
+              content: [
+                { type: "image" as const, source: { type: "base64" as const, media_type: m.image.mediaType, data: m.image.data } },
+                { type: "text" as const, text: m.content },
+              ],
+            }
+          : { role: m.role, content: m.content },
+      ),
       output_config: { effort: "low" },
       // If a request is declined by a safety classifier, retry it on Anthropic's recommended fallback model.
       betas: ["server-side-fallback-2026-07-01"],

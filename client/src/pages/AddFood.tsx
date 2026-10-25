@@ -4,7 +4,7 @@ import { api, MEALS, type FoodEntry, type FoodProduct, type FoodSource, type Mea
 import { useApp } from "../App";
 import { FoodForm, type FoodDraft } from "../components/FoodForm";
 import { DatePicker, ErrorNote, MacroLine, PageHeader } from "../components/ui";
-import { claudeNutritionPrompt, openClaudeWeb, scale } from "../util";
+import { PHOTO_PROMPT, canShareFiles, claudeNutritionPrompt, copyText, openClaudeWeb, preparePhoto, scale, type PhotoData } from "../util";
 
 type Mode = "search" | "scan" | "manual" | "recent";
 
@@ -14,6 +14,8 @@ interface Selection {
   product?: FoodProduct;
   /** The user went to claude.ai to ask about this food. */
   askedClaude?: boolean;
+  /** Instructions shown above the form after handing off to Claude. */
+  note?: string;
 }
 
 // The barcode library is large, so only load it when the Scan tab is opened.
@@ -35,6 +37,7 @@ export function AddFoodPage() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState<PhotoData | null>(null);
 
   useEffect(() => {
     if (mode === "recent" && recent === null) {
@@ -89,6 +92,57 @@ export function AddFoodPage() {
     setSelection({ draft: { ...emptyDraft, name: food, meal }, source: "claude", askedClaude: true });
   };
 
+  const claudeNote =
+    "Claude opened in a new tab with your question. If the question isn't filled in there, paste it: it's been copied. " +
+    "When Claude answers, come back here and type in the numbers, or paste Claude's answer to fill them in.";
+
+  // Photo → Claude. With an API key the photo goes straight to the in-app chat. Without one, the phone's share
+  // sheet sends it to the Claude app (HTTPS only); otherwise Claude opens and the photo is taken there.
+  const shareSupported = !config.claudeEnabled && canShareFiles();
+
+  const onPhotoTaken = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    try {
+      const prepared = await preparePhoto(file);
+      if (config.claudeEnabled) {
+        navigate(`/chat${meal ? `?meal=${meal}` : ""}`, { state: { photo: { data: prepared.data, mediaType: prepared.mediaType, dataUrl: prepared.dataUrl } } });
+      } else {
+        setPhoto(prepared);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const sharePhoto = async () => {
+    if (!photo) return;
+    copyText(PHOTO_PROMPT);
+    try {
+      await navigator.share({ files: [photo.file], text: PHOTO_PROMPT });
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return; // The user closed the share sheet.
+      setError("Couldn't open the share sheet. Open Claude yourself and attach the photo; the question has been copied.");
+    }
+    setPhoto(null);
+    setSelection({
+      draft: { ...emptyDraft, meal },
+      source: "claude",
+      askedClaude: true,
+      note: "Pick Claude in the share sheet and send the photo (the question is included, and also copied in case you need to paste it). When Claude answers, paste its answer here to fill in the numbers.",
+    });
+  };
+
+  const photoInClaude = () => {
+    openClaudeWeb(PHOTO_PROMPT);
+    setSelection({
+      draft: { ...emptyDraft, meal },
+      source: "claude",
+      askedClaude: true,
+      note: "Claude opened with the question ready (it's also copied). In Claude, tap the + or camera button, take a photo of your food and send it. When Claude answers, come back and paste its answer here to fill in the numbers.",
+    });
+  };
+
   const done = () => navigate("/");
 
   if (selection) {
@@ -96,12 +150,7 @@ export function AddFoodPage() {
       <div className="page">
         <PageHeader title="Add food" />
         <DatePicker />
-        {selection.askedClaude && (
-          <p className="note">
-            Claude opened in a new tab with your question. If the question isn't filled in there, paste it: it's been
-            copied. When Claude answers, come back here and type in the numbers, or paste Claude's answer to fill them in.
-          </p>
-        )}
+        {selection.askedClaude && <p className="note">{selection.note ?? claudeNote}</p>}
         <div className="card">
           <FoodForm
             draft={selection.draft}
@@ -136,9 +185,33 @@ export function AddFoodPage() {
         ))}
       </div>
 
-      <button className="claude-button" onClick={askClaude}>
-        ✨ Ask Claude {query.trim() ? `about “${query.trim()}”` : "for nutrition info"}
-      </button>
+      <div className="row claude-row">
+        <button className="claude-button grow" onClick={askClaude}>
+          ✨ Ask Claude{query.trim() ? ` about “${query.trim()}”` : ""}
+        </button>
+        {config.claudeEnabled || shareSupported ? (
+          <label className="claude-button photo-button">
+            📸 Photo
+            <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhotoTaken(e.target.files?.[0])} />
+          </label>
+        ) : (
+          <button className="claude-button photo-button" onClick={photoInClaude}>
+            📸 Photo
+          </button>
+        )}
+      </div>
+
+      {photo && (
+        <div className="card stack">
+          <img src={photo.dataUrl} alt="Your food" className="photo-preview" />
+          <button className="primary" onClick={sharePhoto}>
+            Send to Claude
+          </button>
+          <button className="secondary" onClick={() => setPhoto(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
 
       <ErrorNote error={error} />
 

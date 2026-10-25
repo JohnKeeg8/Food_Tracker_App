@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, MEALS, type ChatMessage, type Meal } from "../api";
 import { useApp } from "../App";
 import { FoodForm } from "../components/FoodForm";
 import { ErrorNote, MacroLine, PageHeader } from "../components/ui";
-import { parseClaudeReply, type ClaudeNutrition } from "../util";
+import { PHOTO_PROMPT, parseClaudeReply, type ClaudeNutrition } from "../util";
 
 const QUESTION_PREFIX = "What is the nutrition information for ";
 
@@ -17,12 +17,14 @@ export function ChatPage() {
   const { config } = useApp();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  // A food photo handed over from Add food.
+  const photo = (useLocation().state as { photo?: { data: string; mediaType: "image/jpeg" } } | null)?.photo;
   const food = params.get("food")?.trim() ?? "";
   const mealParam = params.get("meal");
   const meal = MEALS.includes(mealParam as Meal) ? (mealParam as Meal) : undefined;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState(food || params.get("ask") ? "" : QUESTION_PREFIX);
+  const [input, setInput] = useState(food || params.get("ask") || photo ? "" : QUESTION_PREFIX);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<ClaudeNutrition | null>(null);
@@ -30,8 +32,8 @@ export function ChatPage() {
   const startedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const send = async (text: string, history: ChatMessage[]) => {
-    const next: ChatMessage[] = [...history, { role: "user", content: text }];
+  const send = async (text: string, history: ChatMessage[], image?: ChatMessage["image"]) => {
+    const next: ChatMessage[] = [...history, { role: "user", content: text, ...(image && { image }) }];
     setMessages(next);
     setInput("");
     setError(null);
@@ -51,13 +53,13 @@ export function ChatPage() {
 
   // Open the chat with the predetermined question when arriving from "Ask Claude about …".
   useEffect(() => {
-    const first = ask || (food ? nutritionQuestion(food) : "");
+    const first = photo ? PHOTO_PROMPT : ask || (food ? nutritionQuestion(food) : "");
     if (first && config.claudeEnabled && !startedRef.current) {
       startedRef.current = true;
-      send(first, []);
+      send(first, [], photo ? { data: photo.data, mediaType: photo.mediaType } : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ask, food, config.claudeEnabled]);
+  }, [ask, food, photo, config.claudeEnabled]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -131,6 +133,7 @@ export function ChatPage() {
         {messages.map((m, i) =>
           m.role === "user" ? (
             <div key={i} className="bubble user">
+              {m.image && <img className="bubble-photo" src={`data:${m.image.mediaType};base64,${m.image.data}`} alt="Your food" />}
               {m.content}
             </div>
           ) : (

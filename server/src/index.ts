@@ -16,6 +16,8 @@ const app = express();
 // Trust a reverse proxy (e.g. Caddy) on the local/private network so HTTPS cookies work behind it.
 app.set("trust proxy", "loopback, linklocal, uniquelocal");
 app.disable("x-powered-by");
+// Chat requests can carry a food photo, so they get a larger body limit than the rest of the API.
+app.use("/api/chat", express.json({ limit: "10mb" }));
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(loadSession);
@@ -44,6 +46,12 @@ if (fs.existsSync(clientDist)) {
 }
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // Request-parsing errors (e.g. a body that's too large or isn't valid JSON) carry their own 4xx status.
+  const status = (err as { status?: number }).status;
+  if (status && status >= 400 && status < 500) {
+    res.status(status).json({ error: status === 413 ? "That's too large to upload." : "Invalid request" });
+    return;
+  }
   console.error(err);
   res.status(500).json({ error: "Internal server error" });
 });

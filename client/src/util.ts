@@ -162,7 +162,7 @@ export function openClaudeWeb(prompt: string) {
 }
 
 /** Reads serving size and nutrition numbers out of an answer pasted from Claude. */
-export function parseNutritionText(text: string): (Partial<Nutrition> & { amount?: string }) | null {
+export function parseNutritionText(text: string): (Partial<Nutrition> & { amount?: string; name?: string }) | null {
   // Use the last match for each field, so the summary line at the end of the answer wins.
   const last = (re: RegExp) => {
     const matches = [...text.matchAll(re)];
@@ -178,7 +178,63 @@ export function parseNutritionText(text: string): (Partial<Nutrition> & { amount
     carbs: number(/carb(?:ohydrate)?s?\W{0,4}~?\s*(\d+(?:\.\d+)?)/gi),
     fat: number(/(?<!saturated |trans )fat\W{0,4}~?\s*(\d+(?:\.\d+)?)/gi),
     amount: last(/serving(?: size)?\W{0,4}([^|\n]+?)\s*(?:\||\n|$)/gi)?.replace(/^\*+|\*+$/g, "").trim(),
+    name: last(/(?:^|\n|\|)\W{0,3}food\s*\**\s*:\s*\**\s*([^|\n]+?)\s*(?:\||\n|$)/gi)?.replace(/^\*+|\*+$/g, "").trim(),
   };
   const found = Object.values(result).some((v) => v !== undefined);
   return found ? result : null;
+}
+
+// ---- Food photos ----
+
+/** The question sent with a food photo. Ends with the same summary line so a pasted answer fills the form. */
+export const PHOTO_PROMPT =
+  "Here's a photo of my food. Identify what's in it, estimate the portion sizes, and give the calories, protein, " +
+  "carbs and fat. Say briefly what you assumed. End your answer with one line in exactly this format:\n" +
+  "Food: <short name> | Serving: <size> | Calories: <number> | Protein: <number>g | Carbs: <number>g | Fat: <number>g";
+
+export interface PhotoData {
+  /** Base64 JPEG without the data: prefix. */
+  data: string;
+  mediaType: "image/jpeg";
+  /** For showing a preview. */
+  dataUrl: string;
+  file: File;
+}
+
+/** Shrinks a camera photo to at most `maxSize` px on its longest side and re-encodes it as JPEG. */
+export async function preparePhoto(file: File, maxSize = 1280): Promise<PhotoData> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Couldn't read that photo. Try taking it again."));
+      el.src = url;
+    });
+    const scale = Math.min(1, maxSize / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    const blob = await (await fetch(dataUrl)).blob();
+    return {
+      data: dataUrl.slice(dataUrl.indexOf(",") + 1),
+      mediaType: "image/jpeg",
+      dataUrl,
+      file: new File([blob], "food.jpg", { type: "image/jpeg" }),
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Whether the phone's share sheet can send a photo to another app (needs the app opened over HTTPS). */
+export function canShareFiles(): boolean {
+  try {
+    const probe = new File([new Uint8Array(1)], "probe.jpg", { type: "image/jpeg" });
+    return typeof navigator.canShare === "function" && navigator.canShare({ files: [probe] });
+  } catch {
+    return false;
+  }
 }

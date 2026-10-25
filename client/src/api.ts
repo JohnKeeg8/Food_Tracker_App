@@ -103,6 +103,8 @@ export interface WeightEntry {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  /** A photo attached to a user message (base64 JPEG). */
+  image?: { data: string; mediaType: "image/jpeg" };
 }
 
 export class ApiError extends Error {
