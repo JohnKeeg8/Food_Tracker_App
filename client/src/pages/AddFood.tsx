@@ -4,7 +4,7 @@ import { api, MEALS, type FoodEntry, type FoodProduct, type FoodSource, type Mea
 import { useApp } from "../App";
 import { FoodForm, type FoodDraft } from "../components/FoodForm";
 import { DatePicker, ErrorNote, MacroLine, PageHeader } from "../components/ui";
-import { scale } from "../util";
+import { claudeNutritionPrompt, openClaudeWeb, scale } from "../util";
 
 type Mode = "search" | "scan" | "manual" | "recent";
 
@@ -12,6 +12,8 @@ interface Selection {
   draft: FoodDraft;
   source: FoodSource;
   product?: FoodProduct;
+  /** The user went to claude.ai to ask about this food. */
+  askedClaude?: boolean;
 }
 
 // The barcode library is large, so only load it when the Scan tab is opened.
@@ -72,7 +74,19 @@ export function AddFoodPage() {
 
   const askClaude = () => {
     const food = query.trim();
-    navigate(`/chat${food ? `?food=${encodeURIComponent(food)}` : ""}${meal ? `${food ? "&" : "?"}meal=${meal}` : ""}`);
+    // With an API key on the server, chat inside the app; otherwise use the person's own claude.ai account.
+    if (config.claudeEnabled) {
+      navigate(`/chat${food ? `?food=${encodeURIComponent(food)}` : ""}${meal ? `${food ? "&" : "?"}meal=${meal}` : ""}`);
+      return;
+    }
+    if (!food) {
+      setMode("search");
+      setError("Type the food you want to ask about first, then tap Ask Claude.");
+      return;
+    }
+    setError(null);
+    openClaudeWeb(claudeNutritionPrompt(food));
+    setSelection({ draft: { ...emptyDraft, name: food, meal }, source: "claude", askedClaude: true });
   };
 
   const done = () => navigate("/");
@@ -82,11 +96,18 @@ export function AddFoodPage() {
       <div className="page">
         <PageHeader title="Add food" />
         <DatePicker />
+        {selection.askedClaude && (
+          <p className="note">
+            Claude opened in a new tab with your question. If the question isn't filled in there, paste it: it's been
+            copied. When Claude answers, come back here and type in the numbers, or paste Claude's answer to fill them in.
+          </p>
+        )}
         <div className="card">
           <FoodForm
             draft={selection.draft}
             source={selection.source}
             product={selection.product}
+            pasteFromClaude={selection.askedClaude}
             onSaved={done}
             onCancel={() => setSelection(null)}
           />
@@ -115,11 +136,9 @@ export function AddFoodPage() {
         ))}
       </div>
 
-      {config.claudeEnabled && (
-        <button className="claude-button" onClick={askClaude}>
-          ✨ Ask Claude {query.trim() ? `about “${query.trim()}”` : "for nutrition info"}
-        </button>
-      )}
+      <button className="claude-button" onClick={askClaude}>
+        ✨ Ask Claude {query.trim() ? `about “${query.trim()}”` : "for nutrition info"}
+      </button>
 
       <ErrorNote error={error} />
 

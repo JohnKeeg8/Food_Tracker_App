@@ -121,3 +121,64 @@ export function parseClaudeReply(text: string): { display: string; nutrition: Cl
     return { display, nutrition: null };
   }
 }
+
+// ---- Asking Claude on claude.ai (uses the person's own Claude account, no API key) ----
+
+/** The question sent to Claude. It asks for a summary line the app can read back from a pasted answer. */
+export function claudeNutritionPrompt(food: string): string {
+  return (
+    `What is the nutrition information for ${food}? Give the calories, protein, carbs and fat for a typical serving, ` +
+    `and say what serving size you assumed. End your answer with one line in exactly this format:\n` +
+    `Serving: <size> | Calories: <number> | Protein: <number>g | Carbs: <number>g | Fat: <number>g`
+  );
+}
+
+/** Copies text without the async Clipboard API, which is only available on HTTPS pages. */
+export function copyText(text: string): boolean {
+  try {
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.setAttribute("readonly", "");
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand("copy");
+    el.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Opens a new claude.ai chat with the question filled in, and also copies it so it can be
+ * pasted if the question doesn't fill in (for example when the link opens the Claude app).
+ * Must be called directly from a click handler so the browser doesn't block the new tab.
+ */
+export function openClaudeWeb(prompt: string) {
+  copyText(prompt);
+  window.open(`https://claude.ai/new?q=${encodeURIComponent(prompt)}`, "_blank", "noopener");
+}
+
+/** Reads serving size and nutrition numbers out of an answer pasted from Claude. */
+export function parseNutritionText(text: string): (Partial<Nutrition> & { amount?: string }) | null {
+  // Use the last match for each field, so the summary line at the end of the answer wins.
+  const last = (re: RegExp) => {
+    const matches = [...text.matchAll(re)];
+    return matches.length ? matches[matches.length - 1][1] : undefined;
+  };
+  const number = (re: RegExp) => {
+    const v = last(re);
+    return v === undefined ? undefined : Number(v.replace(/,/g, ""));
+  };
+  const result = {
+    calories: number(/calories\W{0,4}~?\s*([\d,]+(?:\.\d+)?)/gi),
+    protein: number(/protein\W{0,4}~?\s*(\d+(?:\.\d+)?)/gi),
+    carbs: number(/carb(?:ohydrate)?s?\W{0,4}~?\s*(\d+(?:\.\d+)?)/gi),
+    fat: number(/(?<!saturated |trans )fat\W{0,4}~?\s*(\d+(?:\.\d+)?)/gi),
+    amount: last(/serving(?: size)?\W{0,4}([^|\n]+?)\s*(?:\||\n|$)/gi)?.replace(/^\*+|\*+$/g, "").trim(),
+  };
+  const found = Object.values(result).some((v) => v !== undefined);
+  return found ? result : null;
+}

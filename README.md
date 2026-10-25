@@ -8,7 +8,7 @@ A self-hosted health app for your household. It runs on your own server (for exa
   - **Scan a barcode** with your phone's camera, from a photo, or by typing the number. Product data comes from [Open Food Facts](https://world.openfoodfacts.org).
   - **Search** foods by name.
   - **Enter food manually**, or re-log something from your **recent** foods in one tap.
-  - **Ask Claude:** opens a chat with Claude that already asks for the food's nutrition. Claude's estimate has an **Add to log** button, and you can keep chatting.
+  - **Ask Claude:** type a food and tap Ask Claude. A new claude.ai chat opens with the nutrition question already filled in, using your own Claude account (no API key needed). Then type Claude's numbers into the form, or paste its answer to fill them in.
 - **Water tracker:** quick-add buttons, a daily goal, and 7-day history. Amounts can be shown in oz or ml.
 - **Recipes:** save your recipes with ingredients and servings. The app works out the nutrition per serving, so you can log a serving in one tap.
 - **Workouts:** recommended plans for **home** and **gym** based on your goal (lose fat, build muscle, get fitter, core), plus an exercise library. Each exercise has step-by-step instructions and a **Watch how to do it** link to how-to videos.
@@ -43,7 +43,7 @@ curl -fsSL https://get.docker.com | sh
 git clone https://github.com/JohnKeeg8/food_tracker_app.git
 cd food_tracker_app
 cp .env.example .env
-nano .env        # paste your Anthropic API key, then save with Ctrl+O, Enter, Ctrl+X
+nano .env        # optional: change settings, then save with Ctrl+O, Enter, Ctrl+X
 ```
 
 ### 3. Start it
@@ -81,14 +81,16 @@ For the live camera view, use one of these:
 
 ## Ask Claude
 
-"Ask Claude" uses the [Anthropic API](https://console.anthropic.com). Create an API key there, put it in `.env` as `ANTHROPIC_API_KEY`, and restart with `docker compose up -d`. API usage is billed to that key's account. The app uses short answers to keep costs low. If the key is left empty, the Ask Claude buttons are hidden.
+By default, Ask Claude opens **claude.ai** in a new tab with the question already written. It uses your normal Claude account (free or paid), so it costs nothing extra and needs no setup. The question is also copied to your clipboard; if the Claude app opens instead and the question isn't filled in, paste it. Claude ends its answer with a summary line (`Serving: … | Calories: … | Protein: …g | Carbs: …g | Fat: …g`). Paste the answer into the **Paste Claude's answer** box and the numbers fill in, or type them in yourself.
+
+**Optional: chat inside the app.** If you set `ANTHROPIC_API_KEY` in `.env` (from [console.anthropic.com](https://console.anthropic.com)), Ask Claude instead opens a chat inside the app with a one-tap **Add to log** button. That uses the Anthropic API, which is billed per token, separately from a Claude subscription.
 
 ## Settings (`.env`)
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | (empty) | Enables Ask Claude. |
-| `CLAUDE_MODEL` | `claude-opus-5-5` | Claude model used for the chat. |
+| `ANTHROPIC_API_KEY` | (empty) | Optional. Chat with Claude inside the app (billed per token). Empty = Ask Claude opens claude.ai. |
+| `CLAUDE_MODEL` | `claude-opus-5-5` | Claude model for the in-app chat (only with an API key). |
 | `ALLOW_SIGNUP` | `true` | Whether new accounts can be created. |
 | `SIGNUP_CODE` | (empty) | If set, people must enter this code to sign up. |
 | `APP_PORT` | `8080` | Port the app is served on. |

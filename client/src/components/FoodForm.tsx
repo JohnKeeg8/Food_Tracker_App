@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, MEALS, type FoodProduct, type FoodSource, type Meal, type Nutrition } from "../api";
 import { useApp } from "../App";
-import { capitalize, defaultMeal, round, scale } from "../util";
+import { capitalize, defaultMeal, parseNutritionText, round, scale } from "../util";
 import { ErrorNote } from "./ui";
 
 export interface FoodDraft extends Nutrition {
@@ -20,6 +20,8 @@ interface Props {
   /** When set, the form edits this existing entry instead of adding a new one. */
   entryId?: number;
   date?: string;
+  /** Show a box for pasting Claude's answer from claude.ai to fill in the numbers. */
+  pasteFromClaude?: boolean;
   onSaved: () => void;
   onCancel?: () => void;
 }
@@ -33,7 +35,7 @@ const fields: { key: keyof Nutrition; label: string; unit: string }[] = [
   { key: "fat", label: "Fat", unit: "g" },
 ];
 
-export function FoodForm({ draft, source, product, entryId, date: dateOverride, onSaved, onCancel }: Props) {
+export function FoodForm({ draft, source, product, entryId, date: dateOverride, pasteFromClaude, onSaved, onCancel }: Props) {
   const app = useApp();
   const date = dateOverride ?? app.date;
   const [name, setName] = useState(draft.name);
@@ -49,6 +51,24 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
   const [quantity, setQuantity] = useState(product?.perServing ? "1" : "100");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
+
+  const onPaste = (text: string) => {
+    const parsed = parseNutritionText(text);
+    if (!parsed) {
+      setPasteNote(text.trim() ? "Couldn't find the numbers in that text. Type them in below." : null);
+      return;
+    }
+    const str = (v: number | undefined, current: string) => (v === undefined || !Number.isFinite(v) ? current : String(v));
+    setValues((v) => ({
+      calories: str(parsed.calories, v.calories),
+      protein: str(parsed.protein, v.protein),
+      carbs: str(parsed.carbs, v.carbs),
+      fat: str(parsed.fat, v.fat),
+    }));
+    if (parsed.amount) setAmount(parsed.amount);
+    setPasteNote("Filled in from Claude's answer. Check the numbers, then add it.");
+  };
 
   // Recalculate nutrition when the portion of a looked-up product changes.
   useEffect(() => {
@@ -110,6 +130,14 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
         <input value={name} onChange={(e) => setName(e.target.value)} required />
       </label>
       {draft.brand && <p className="muted small">{draft.brand}</p>}
+
+      {pasteFromClaude && (
+        <label>
+          Paste Claude's answer <span className="muted small">(optional, fills in the numbers)</span>
+          <textarea rows={3} placeholder="Copy Claude's reply and paste it here…" onChange={(e) => onPaste(e.target.value)} />
+          {pasteNote && <span className="muted small">{pasteNote}</span>}
+        </label>
+      )}
 
       {product && (
         <div className="row">
