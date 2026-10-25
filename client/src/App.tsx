@@ -71,9 +71,9 @@ export function App() {
         </main>
         <nav className="tabbar">
           <Tab to="/" icon="🏠" label="Today" />
-          <Tab to="/add" icon="➕" label="Add food" />
-          <Tab to="/water" icon="💧" label="Water" />
           <Tab to="/recipes" icon="📖" label="Recipes" />
+          <Tab to="/add" icon="+" label="Add food" primary />
+          <Tab to="/water" icon="💧" label="Water" primary />
           <Tab to="/workouts" icon="🏋️" label="Workouts" />
           <Tab to="/me" icon="👤" label="Me" />
         </nav>
@@ -82,9 +82,10 @@ export function App() {
   );
 }
 
-function Tab({ to, icon, label }: { to: string; icon: string; label: string }) {
+/** `primary` tabs are the main actions (adding food and water), shown as raised buttons in the middle. */
+function Tab({ to, icon, label, primary }: { to: string; icon: string; label: string; primary?: boolean }) {
   return (
-    <NavLink to={to} end className={({ isActive }) => (isActive ? "tab active" : "tab")}>
+    <NavLink to={to} end className={({ isActive }) => ["tab", primary && "tab-primary", isActive && "active"].filter(Boolean).join(" ")}>
       <span className="tab-icon" aria-hidden>
         {icon}
       </span>
