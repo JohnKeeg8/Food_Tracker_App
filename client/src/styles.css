@@ -1,36 +1,27 @@
 :root {
-  --bg: #f4f6f8;
-  --card: #ffffff;
-  --text: #17202a;
-  --muted: #64707d;
-  --border: #e2e6ea;
-  --green: #16a34a;
-  --green-dark: #12803b;
-  --green-soft: #e8f7ee;
-  --blue: #3b82f6;
-  --amber: #f59e0b;
-  --pink: #ec4899;
-  --sky: #0ea5e9;
-  --red: #dc2626;
-  --red-soft: #fdecec;
-  --claude: #c2410c;
-  --claude-soft: #fff1e8;
+  /* Always-dark theme with a blue accent. */
+  --bg: #0b1220;
+  --card: #131c2e;
+  --input: #0e1626;
+  --text: #e6edf7;
+  --muted: #8b9ab3;
+  --border: #24314a;
+  --accent: #3b82f6;
+  --accent-dark: #2563eb;
+  --accent-soft: #15284a;
+  --success: #34d399;
+  --success-soft: #0f2e24;
+  --violet: #a78bfa;
+  --amber: #fbbf24;
+  --pink: #f472b6;
+  --sky: #38bdf8;
+  --red: #f87171;
+  --red-soft: #3a1a1f;
+  --claude: #fb923c;
+  --claude-soft: #2e1d12;
   --radius: 14px;
   --tabbar: 64px;
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1419;
-    --card: #1a2129;
-    --text: #e8edf2;
-    --muted: #94a0ad;
-    --border: #2b3540;
-    --green-soft: #12301f;
-    --red-soft: #3a1717;
-    --claude-soft: #3a2214;
-  }
+  color-scheme: dark;
 }
 
 * {
@@ -76,13 +67,13 @@ textarea {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: var(--card);
+  background: var(--input);
   min-height: 44px;
 }
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid var(--green);
+  outline: 2px solid var(--accent);
   outline-offset: -1px;
 }
 textarea {
@@ -117,11 +108,11 @@ button:disabled {
   cursor: default;
 }
 .primary {
-  background: var(--green);
+  background: var(--accent);
   color: #fff;
 }
 .primary:hover:not(:disabled) {
-  background: var(--green-dark);
+  background: var(--accent-dark);
 }
 .secondary {
   background: var(--card);
@@ -132,7 +123,7 @@ button:disabled {
   color: var(--red);
 }
 .link-button {
-  color: var(--green);
+  color: var(--accent);
   padding: 6px 0;
   min-height: 0;
   font-weight: 600;
@@ -252,14 +243,14 @@ button:disabled {
   margin: 0;
 }
 .success {
-  color: var(--green);
-  background: var(--green-soft);
+  color: var(--success);
+  background: var(--success-soft);
   padding: 8px 12px;
   border-radius: 10px;
   margin: 0;
 }
 .success-text {
-  color: var(--green);
+  color: var(--success);
   font-weight: 600;
 }
 .note {
@@ -306,7 +297,7 @@ button:disabled {
   opacity: 0.7;
 }
 .tab.active {
-  color: var(--green);
+  color: var(--accent);
 }
 .tab.active .tab-icon {
   filter: none;
@@ -331,7 +322,7 @@ button:disabled {
   color: var(--muted);
 }
 .segmented button.selected {
-  background: var(--green);
+  background: var(--accent);
   color: #fff;
 }
 .chips {
@@ -349,8 +340,8 @@ button:disabled {
   font-size: 0.85rem;
 }
 .chip.selected {
-  background: var(--green);
-  border-color: var(--green);
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 .badge {
@@ -359,8 +350,8 @@ button:disabled {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--green);
-  background: var(--green-soft);
+  color: var(--accent);
+  background: var(--accent-soft);
   border-radius: 6px;
   padding: 2px 6px;
   margin-bottom: 4px;
@@ -398,7 +389,7 @@ button:disabled {
 .progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--green);
+  background: var(--accent);
   transition: width 0.3s;
 }
 .progress-fill.over {
@@ -522,7 +513,7 @@ button:disabled {
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--green);
+  background: var(--accent);
   border-radius: 6px 6px 0 0;
 }
 .week-fill.over {
@@ -632,7 +623,7 @@ button:disabled {
 }
 .bubble.user {
   align-self: flex-end;
-  background: var(--green);
+  background: var(--accent);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
@@ -656,7 +647,7 @@ button:disabled {
   margin-top: 10px;
   padding: 10px;
   border-radius: 10px;
-  background: var(--green-soft);
+  background: var(--accent-soft);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -707,7 +698,7 @@ button:disabled {
 /* ---- Workouts ---- */
 
 .routine.recommended {
-  border-color: var(--green);
+  border-color: var(--accent);
 }
 .routine-header,
 .exercise-header {
@@ -731,7 +722,7 @@ button:disabled {
   padding-bottom: 10px;
 }
 .prescription {
-  color: var(--green);
+  color: var(--accent);
   font-weight: 600;
   font-size: 0.9rem;
 }

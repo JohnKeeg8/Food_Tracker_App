@@ -91,9 +91,9 @@ export function TodayPage() {
               <div className="muted small">goal</div>
             </div>
           </div>
-          <ProgressBar value={totals.calories} max={goals.calories} color="var(--green)" />
+          <ProgressBar value={totals.calories} max={goals.calories} color="var(--accent)" />
           <div className="macros">
-            <Macro label="Protein" value={totals.protein} goal={goals.protein} color="var(--blue)" />
+            <Macro label="Protein" value={totals.protein} goal={goals.protein} color="var(--violet)" />
             <Macro label="Carbs" value={totals.carbs} goal={goals.carbs} color="var(--amber)" />
             <Macro label="Fat" value={totals.fat} goal={goals.fat} color="var(--pink)" />
           </div>

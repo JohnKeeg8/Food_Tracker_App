@@ -32,7 +32,7 @@ export function LoginPage({ config, onSignedIn }: { config: AppConfig; onSignedI
     <div className="login">
       <div className="card login-card">
         <div className="login-logo" aria-hidden>
-          💚
+          💙
         </div>
         <h1>Health Tracker</h1>
         <p className="muted">{mode === "login" ? "Sign in to your account" : "Create your own account"}</p>
