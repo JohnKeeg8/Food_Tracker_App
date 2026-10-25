@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api, MEALS, type DaySummary, type FoodEntry, type Goals, type WaterEntry } from "../api";
+import { Link, useNavigate } from "react-router-dom";
+import { api, MEALS, type DaySummary, type FoodEntry, type Goals, type Profile, type WaterEntry } from "../api";
 import { useApp } from "../App";
 import { FoodForm } from "../components/FoodForm";
 import { DatePicker, ErrorNote, MacroLine, PageHeader, ProgressBar } from "../components/ui";
-import { capitalize, formatWater, getWaterUnit, sum, unitToMl } from "../util";
+import { GOAL_TEXT, dailyTip, mealIdeasPrompt } from "../health";
+import { capitalize, formatWater, getWaterUnit, openClaudeWeb, sum, today, unitToMl } from "../util";
 
 export function TodayPage() {
-  const { user, date } = useApp();
+  const { user, date, config } = useApp();
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [goals, setGoals] = useState<Goals | null>(null);
   const [food, setFood] = useState<FoodEntry[]>([]);
   const [water, setWater] = useState<WaterEntry[]>([]);
@@ -17,8 +20,9 @@ export function TodayPage() {
   const unit = getWaterUnit();
 
   const load = useCallback(() => {
-    Promise.all([api.goals(), api.food(date), api.water(date), api.history(date, 7)])
-      .then(([g, f, w, h]) => {
+    Promise.all([api.goals(), api.food(date), api.water(date), api.history(date, 7), api.profile()])
+      .then(([g, f, w, h, p]) => {
+        setProfile(p.profile);
         setGoals(g);
         setFood(f);
         setWater(w);
@@ -65,6 +69,18 @@ export function TodayPage() {
   }
 
   // Leave headroom above the tallest bar/goal so the dashed goal line stays visible.
+  const remaining = goals
+    ? { calories: goals.calories - totals.calories, protein: goals.protein - totals.protein, carbs: goals.carbs - totals.carbs, fat: goals.fat - totals.fat }
+    : null;
+
+  const askMealIdeas = () => {
+    if (!profile || !remaining) return;
+    const prompt = mealIdeasPrompt(profile.goal, remaining);
+    // With an API key, chat in the app; otherwise open the person's own claude.ai account.
+    if (config.claudeEnabled) navigate(`/chat?ask=${encodeURIComponent(prompt)}`);
+    else openClaudeWeb(prompt);
+  };
+
   const maxCal = Math.max(goals?.calories ?? 0, ...history.map((h) => h.calories), 1) * 1.15;
 
   return (
@@ -73,8 +89,23 @@ export function TodayPage() {
       <DatePicker />
       <ErrorNote error={error} />
 
+      {profile === null && (
+        <Link to="/me" className="card setup-card">
+          <strong>🎯 Set up your plan</strong>
+          <span className="muted small block">Add your height, weight, age and goal to get calorie targets for losing, maintaining or gaining weight.</span>
+        </Link>
+      )}
+
       {goals && (
         <section className="card">
+          {profile && remaining && (
+            <div className="goal-banner">
+              <Link to="/me" className="goal-name">
+                🎯 {GOAL_TEXT[profile.goal]}
+              </Link>
+              {date === today() && <p className="small">{dailyTip(profile.goal, remaining)}</p>}
+            </div>
+          )}
           <div className="calorie-summary">
             <div>
               <div className="big-number">{Math.round(totals.calories)}</div>
@@ -97,6 +128,11 @@ export function TodayPage() {
             <Macro label="Carbs" value={totals.carbs} goal={goals.carbs} color="var(--amber)" />
             <Macro label="Fat" value={totals.fat} goal={goals.fat} color="var(--pink)" />
           </div>
+          {profile && date === today() && remaining && remaining.calories > 100 && (
+            <button className="claude-button meal-ideas" onClick={askMealIdeas}>
+              ✨ Ask Claude for meal ideas that fit
+            </button>
+          )}
         </section>
       )}
 

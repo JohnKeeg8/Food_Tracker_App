@@ -61,6 +61,28 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_water_user_date ON water_entries(user_id, date);
 
+  CREATE TABLE IF NOT EXISTS profiles (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    sex        TEXT NOT NULL,
+    age        INTEGER NOT NULL,
+    height_cm  REAL NOT NULL,
+    activity   TEXT NOT NULL,
+    goal       TEXT NOT NULL,
+    pace       TEXT NOT NULL,
+    units      TEXT NOT NULL DEFAULT 'imperial',
+    auto_goals INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS weight_entries (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date       TEXT NOT NULL,
+    weight_kg  REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, date)
+  );
+
   CREATE TABLE IF NOT EXISTS recipes (
     id           INTEGER PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

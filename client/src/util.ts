@@ -84,7 +84,7 @@ export function setWaterUnit(unit: WaterUnit) {
   }
 }
 
-export const mlToUnit = (ml: number, unit: WaterUnit) => (unit === "oz" ? round(ml / ML_PER_OZ, 1) : round(ml));
+export const mlToUnit = (ml: number, unit: WaterUnit) => round(unit === "oz" ? ml / ML_PER_OZ : ml);
 export const unitToMl = (value: number, unit: WaterUnit) => (unit === "oz" ? value * ML_PER_OZ : value);
 export const formatWater = (ml: number, unit: WaterUnit) => `${mlToUnit(ml, unit)} ${unit}`;
 

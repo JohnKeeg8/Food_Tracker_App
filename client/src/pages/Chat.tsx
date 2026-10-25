@@ -22,7 +22,7 @@ export function ChatPage() {
   const meal = MEALS.includes(mealParam as Meal) ? (mealParam as Meal) : undefined;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState(food ? "" : QUESTION_PREFIX);
+  const [input, setInput] = useState(food || params.get("ask") ? "" : QUESTION_PREFIX);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<ClaudeNutrition | null>(null);
@@ -46,14 +46,18 @@ export function ChatPage() {
     }
   };
 
+  // A full question passed in by another screen (e.g. meal ideas from Today).
+  const ask = params.get("ask")?.trim() ?? "";
+
   // Open the chat with the predetermined question when arriving from "Ask Claude about …".
   useEffect(() => {
-    if (food && config.claudeEnabled && !startedRef.current) {
+    const first = ask || (food ? nutritionQuestion(food) : "");
+    if (first && config.claudeEnabled && !startedRef.current) {
       startedRef.current = true;
-      send(nutritionQuestion(food), []);
+      send(first, []);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [food, config.claudeEnabled]);
+  }, [ask, food, config.claudeEnabled]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

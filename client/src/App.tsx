@@ -10,6 +10,7 @@ import { WaterPage } from "./pages/Water";
 import { RecipesPage } from "./pages/Recipes";
 import { WorkoutsPage } from "./pages/Workouts";
 import { SettingsPage } from "./pages/Settings";
+import { MePage } from "./pages/Me";
 
 interface AppState {
   user: User;
@@ -63,6 +64,7 @@ export function App() {
             <Route path="/water" element={<WaterPage />} />
             <Route path="/recipes" element={<RecipesPage />} />
             <Route path="/workouts" element={<WorkoutsPage />} />
+            <Route path="/me" element={<MePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -73,6 +75,7 @@ export function App() {
           <Tab to="/water" icon="💧" label="Water" />
           <Tab to="/recipes" icon="📖" label="Recipes" />
           <Tab to="/workouts" icon="🏋️" label="Workouts" />
+          <Tab to="/me" icon="👤" label="Me" />
         </nav>
       </div>
     </AppContext.Provider>

@@ -82,6 +82,24 @@ export interface DaySummary extends Nutrition {
   waterMl: number;
 }
 
+export interface Profile {
+  sex: "male" | "female";
+  age: number;
+  heightCm: number;
+  activity: "sedentary" | "light" | "moderate" | "active" | "very-active";
+  goal: "lose" | "maintain" | "gain";
+  pace: "slow" | "moderate" | "fast";
+  units: "imperial" | "metric";
+  /** Update daily goals automatically when the profile or weight changes. */
+  autoGoals: boolean;
+}
+
+export interface WeightEntry {
+  id: number;
+  date: string;
+  weightKg: number;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -146,6 +164,13 @@ export const api = {
   deleteRecipe: (id: number) => request<{ ok: true }>("DELETE", `/api/recipes/${id}`),
   logRecipe: (id: number, date: string, meal: Meal, servings: number) =>
     request<FoodEntry>("POST", `/api/recipes/${id}/log`, { date, meal, servings }),
+
+  profile: () => request<{ profile: Profile | null }>("GET", "/api/profile"),
+  saveProfile: (p: Profile) => request<{ profile: Profile }>("PUT", "/api/profile", p),
+  weights: (days = 365) => request<WeightEntry[]>("GET", `/api/weights?days=${days}`),
+  latestWeight: () => request<WeightEntry | null>("GET", "/api/weights/latest"),
+  logWeight: (date: string, weightKg: number) => request<WeightEntry>("POST", "/api/weights", { date, weightKg }),
+  deleteWeight: (id: number) => request<{ ok: true }>("DELETE", `/api/weights/${id}`),
 
   chat: (messages: ChatMessage[]) => request<{ text: string }>("POST", "/api/chat", { messages }),
 };
