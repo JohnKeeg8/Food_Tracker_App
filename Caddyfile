@@ -1,0 +1,8 @@
+# SITE_ADDRESS comes from .env, e.g. 192.168.1.50 or health.home.lan
+{$SITE_ADDRESS} {
+	# Self-signed certificate from Caddy's own local CA (fine for a home network).
+	# If SITE_ADDRESS is a real public domain pointing at this server, delete this line
+	# and Caddy will get a trusted Let's Encrypt certificate automatically.
+	tls internal
+	reverse_proxy app:8080
+}
