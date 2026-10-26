@@ -872,3 +872,31 @@ button:disabled {
   border-radius: 10px;
   margin-bottom: 6px;
 }
+
+/* ---- Portion eaten ---- */
+
+.portion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 10px;
+}
+.portion-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.portion-buttons button {
+  padding: 6px 2px;
+  font-size: 0.95rem;
+}
+.portion-custom {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+.portion-custom input {
+  width: 90px;
+}
