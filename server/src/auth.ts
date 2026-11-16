@@ -177,7 +177,10 @@ authRouter.post("/password", requireUser, (req, res) => {
   res.json({ ok: true });
 });
 
-/** Remove expired sessions; called periodically. */
+/** Remove expired sessions and stale login-attempt records; called periodically. */
 export function pruneSessions() {
   db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
+  for (const [key, entry] of failedLogins) {
+    if (entry.until < Date.now()) failedLogins.delete(key);
+  }
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { api, type AppConfig, type User } from "./api";
 import { today } from "./util";
@@ -42,6 +42,26 @@ export function App() {
         setUser(me.user);
       })
       .catch(() => setLoadError("Can't reach the server. Check that it's running and refresh."));
+  }, []);
+
+  // If the app is left open overnight, move on to the new day when it's next looked at,
+  // unless the person had deliberately picked another date.
+  const lastToday = useRef(today());
+  useEffect(() => {
+    const check = () => {
+      const now = today();
+      if (now === lastToday.current) return;
+      const previous = lastToday.current;
+      lastToday.current = now;
+      setDate((current) => (current === previous ? now : current));
+    };
+    const onVisible = () => document.visibilityState === "visible" && check();
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(check, 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(timer);
+    };
   }, []);
 
   if (loadError) return <div className="center-screen">{loadError}</div>;

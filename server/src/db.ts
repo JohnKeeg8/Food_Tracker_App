@@ -83,6 +83,35 @@ db.exec(`
     UNIQUE (user_id, date)
   );
 
+  CREATE TABLE IF NOT EXISTS workouts (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date       TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    notes      TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_workouts_user_date ON workouts(user_id, date);
+
+  CREATE TABLE IF NOT EXISTS workout_exercises (
+    id          INTEGER PRIMARY KEY,
+    workout_id  INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+    position    INTEGER NOT NULL,
+    exercise_id TEXT,
+    name        TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_workout_exercises_workout ON workout_exercises(workout_id);
+
+  CREATE TABLE IF NOT EXISTS workout_sets (
+    id                  INTEGER PRIMARY KEY,
+    workout_exercise_id INTEGER NOT NULL REFERENCES workout_exercises(id) ON DELETE CASCADE,
+    position            INTEGER NOT NULL,
+    weight_kg           REAL,
+    reps                INTEGER,
+    seconds             INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_workout_sets_exercise ON workout_sets(workout_exercise_id);
+
   CREATE TABLE IF NOT EXISTS recipes (
     id           INTEGER PRIMARY KEY,
     user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

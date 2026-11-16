@@ -13,7 +13,10 @@ A self-hosted health app for your household. It runs on your own server (for exa
 - **Me (your plan):** enter your sex, age, height, weight and activity level, and choose whether to **lose, maintain or gain** weight (and how fast). The app works out your daily calories, protein, carbs, fat and water using the Mifflin–St Jeor formula, and can set them as your daily goals. When you log a new weight, the goals update automatically. A weight log with a chart tracks your progress. Today shows a tip for your goal, and an **Ask Claude for meal ideas** button that asks Claude for meals fitting what you have left for the day.
 - **Water tracker:** quick-add buttons, a daily goal, and 7-day history. Amounts can be shown in oz or ml.
 - **Recipes:** save your recipes with ingredients and servings. The app works out the nutrition per serving, so you can log a serving in one tap.
-- **Workouts:** recommended plans for **home** and **gym** based on your goal (lose fat, build muscle, get fitter, core), plus an exercise library. Each exercise has step-by-step instructions and a **Watch how to do it** link to how-to videos.
+- **Workouts:**
+  - **My log:** record a workout with the weight and reps for each set (or the time, for cardio and planks). Start from scratch, from a common workout (push/pull/legs, upper body, full body, home routines…), or repeat one of your own. While you record, each exercise shows what you did last time. Your history and personal bests are kept, and the day's workout shows on Today. A workout in progress is saved on your phone until you finish, so you can lock it between sets.
+  - **Plans:** recommended routines for **home** and **gym** based on your goal (lose fat, build muscle, get fitter, core). Tap **Start & record this workout** to log one.
+  - **Exercises:** a library with step-by-step instructions and a **Watch how to do it** link to how-to videos. You can also add your own exercises while recording.
 - **Multiple users:** each person signs in with their own username and password. Logs, water, recipes and goals are separate, so nobody's entries mix with anyone else's.
 - **Everything is stored on your server** in one SQLite file (`data/health.db`).
 
@@ -73,6 +76,15 @@ docker compose up -d --build
 
 Your data in `data/` is kept.
 
+### Forgotten password
+
+If someone forgets their password, reset it from the container's console:
+
+```bash
+cd food_tracker_app
+docker compose exec app node server/dist/reset-password.js <username> <new-password>
+```
+
 ### Backups
 
 All data is in `food_tracker_app/data/health.db`. Proxmox's built-in backups (**Datacenter → Backup**) of the container include it. You can also copy the file somewhere else.
@@ -120,6 +132,8 @@ Project layout:
   - `src/auth.ts`: accounts and sessions.
   - `src/routes/tracking.ts`: food, water, goals and history.
   - `src/routes/recipes.ts`: recipes.
+  - `src/routes/workouts.ts`: recorded workouts.
+  - `src/routes/profile.ts`: health profile and weight log.
   - `src/routes/lookup.ts`: Open Food Facts barcode lookup and search.
   - `src/routes/chat.ts`: Ask Claude.
 - `client/`: React + Vite web app.

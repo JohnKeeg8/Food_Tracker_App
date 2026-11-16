@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, type Goals } from "../api";
+import { Link } from "react-router-dom";
+import { api, type Goals, type Profile } from "../api";
 import { useApp } from "../App";
 import { ErrorNote, PageHeader } from "../components/ui";
 import { getWaterUnit, mlToUnit, setWaterUnit, unitToMl, type WaterUnit } from "../util";
@@ -9,6 +10,7 @@ export function SettingsPage() {
   const [goals, setGoals] = useState<Record<keyof Goals, string> | null>(null);
   const [unit, setUnit] = useState<WaterUnit>(getWaterUnit());
   const [saved, setSaved] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pw, setPw] = useState({ current: "", next: "" });
   const [pwMessage, setPwMessage] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export function SettingsPage() {
         }),
       )
       .catch((err) => setError(err.message));
+    api.profile().then((p) => setProfile(p.profile)).catch(() => undefined);
   }, []);
 
   const changeUnit = (next: WaterUnit) => {
@@ -48,6 +51,8 @@ export function SettingsPage() {
         waterMl: Math.round(unitToMl(Number(goals.waterMl) || 0, unit)),
       });
       setWaterUnit(unit);
+      // Goals typed in by hand take over from the plan, so a later weigh-in doesn't overwrite them.
+      if (profile?.autoGoals) setProfile((await api.saveProfile({ ...profile, autoGoals: false })).profile);
       setSaved(true);
     } catch (err) {
       setError((err as Error).message);
@@ -98,6 +103,12 @@ export function SettingsPage() {
       <form className="card stack" onSubmit={saveGoals}>
         <h2>Daily goals</h2>
         {!goals && <p className="muted">Loading…</p>}
+        {profile?.autoGoals && (
+          <p className="note">
+            These goals are set from your plan on the <Link to="/me">Me</Link> tab and update when you log your weight. Saving
+            your own numbers here turns that off.
+          </p>
+        )}
         {goalField("calories", "Calories", "kcal")}
         <div className="grid-3">
           {goalField("protein", "Protein", "g")}
@@ -115,7 +126,11 @@ export function SettingsPage() {
           </label>
         </div>
         <ErrorNote error={error} />
-        {saved && <p className="success">Saved.</p>}
+        {saved && (
+          <p className="success">
+            Saved.{profile && !profile.autoGoals && " Your goals stay as you set them. To follow your plan again, tick the box under Me → Edit details."}
+          </p>
+        )}
         <button className="primary">Save goals</button>
       </form>
 

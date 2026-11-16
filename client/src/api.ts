@@ -100,6 +100,30 @@ export interface WeightEntry {
   weightKg: number;
 }
 
+export interface WorkoutSet {
+  weightKg: number | null;
+  reps: number | null;
+  seconds: number | null;
+}
+
+export interface WorkoutExercise {
+  /** Id from the exercise library, or null for a custom exercise. */
+  exerciseId: string | null;
+  name: string;
+  sets: WorkoutSet[];
+}
+
+export interface WorkoutInput {
+  date: string;
+  name: string;
+  notes: string;
+  exercises: WorkoutExercise[];
+}
+
+export interface Workout extends WorkoutInput {
+  id: number;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -173,6 +197,12 @@ export const api = {
   latestWeight: () => request<WeightEntry | null>("GET", "/api/weights/latest"),
   logWeight: (date: string, weightKg: number) => request<WeightEntry>("POST", "/api/weights", { date, weightKg }),
   deleteWeight: (id: number) => request<{ ok: true }>("DELETE", `/api/weights/${id}`),
+
+  workouts: (limit = 200) => request<Workout[]>("GET", `/api/workouts?limit=${limit}`),
+  workoutsOn: (date: string) => request<Workout[]>("GET", `/api/workouts?date=${enc(date)}`),
+  createWorkout: (w: WorkoutInput) => request<Workout>("POST", "/api/workouts", w),
+  updateWorkout: (id: number, w: WorkoutInput) => request<Workout>("PUT", `/api/workouts/${id}`, w),
+  deleteWorkout: (id: number) => request<{ ok: true }>("DELETE", `/api/workouts/${id}`),
 
   chat: (messages: ChatMessage[]) => request<{ text: string }>("POST", "/api/chat", { messages }),
 };

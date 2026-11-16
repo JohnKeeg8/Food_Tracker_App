@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, MEALS, type DaySummary, type FoodEntry, type Goals, type Profile, type WaterEntry } from "../api";
+import { api, MEALS, type DaySummary, type FoodEntry, type Goals, type Profile, type WaterEntry, type Workout } from "../api";
 import { useApp } from "../App";
 import { FoodForm } from "../components/FoodForm";
 import { DatePicker, ErrorNote, MacroLine, PageHeader, ProgressBar } from "../components/ui";
@@ -15,13 +15,15 @@ export function TodayPage() {
   const [food, setFood] = useState<FoodEntry[]>([]);
   const [water, setWater] = useState<WaterEntry[]>([]);
   const [history, setHistory] = useState<DaySummary[]>([]);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [editing, setEditing] = useState<FoodEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const unit = getWaterUnit();
 
   const load = useCallback(() => {
-    Promise.all([api.goals(), api.food(date), api.water(date), api.history(date, 7), api.profile()])
-      .then(([g, f, w, h, p]) => {
+    Promise.all([api.goals(), api.food(date), api.water(date), api.history(date, 7), api.profile(), api.workoutsOn(date)])
+      .then(([g, f, w, h, p, wk]) => {
+        setWorkouts(wk);
         setProfile(p.profile);
         setGoals(g);
         setFood(f);
@@ -68,7 +70,6 @@ export function TodayPage() {
     );
   }
 
-  // Leave headroom above the tallest bar/goal so the dashed goal line stays visible.
   const remaining = goals
     ? { calories: goals.calories - totals.calories, protein: goals.protein - totals.protein, carbs: goals.carbs - totals.carbs, fat: goals.fat - totals.fat }
     : null;
@@ -81,6 +82,7 @@ export function TodayPage() {
     else openClaudeWeb(prompt);
   };
 
+  // Leave headroom above the tallest bar/goal so the dashed goal line stays visible.
   const maxCal = Math.max(goals?.calories ?? 0, ...history.map((h) => h.calories), 1) * 1.15;
 
   return (
@@ -154,6 +156,24 @@ export function TodayPage() {
             </Link>
           </div>
         </section>
+      )}
+
+      {workouts.length > 0 && (
+        <Link to="/workouts" className="card workout-today">
+          <h2>💪 Workout</h2>
+          {workouts.map((w) => {
+            const sets = w.exercises.reduce((n, e) => n + e.sets.length, 0);
+            return (
+              <div key={w.id}>
+                <strong>{w.name}</strong>
+                <span className="muted small">
+                  {" "}
+                  · {w.exercises.length} exercise{w.exercises.length === 1 ? "" : "s"} · {sets} set{sets === 1 ? "" : "s"}
+                </span>
+              </div>
+            );
+          })}
+        </Link>
       )}
 
       {MEALS.map((meal) => {

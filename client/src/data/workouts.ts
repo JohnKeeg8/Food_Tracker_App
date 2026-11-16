@@ -610,6 +610,139 @@ export const EXERCISES: Exercise[] = [
     steps: ["Stand on the balls of your feet (on a step for more range).", "Rise up as high as you can, pause, then lower slowly."],
     video: "how to do calf raises proper form",
   },
+  // ---- More common gym and cardio exercises ----
+  {
+    id: "db-bench",
+    name: "Dumbbell bench press",
+    locations: ["home", "gym"],
+    equipment: "Dumbbells + bench",
+    muscles: ["chest", "shoulders", "arms"],
+    level: "beginner",
+    steps: [
+      "Lie on a flat bench with a dumbbell in each hand at chest level.",
+      "Press the weights up until your arms are straight above your chest.",
+      "Lower slowly until the dumbbells are beside your chest.",
+    ],
+    video: "how to do dumbbell bench press proper form",
+  },
+  {
+    id: "barbell-row",
+    name: "Barbell bent-over row",
+    locations: ["gym"],
+    equipment: "Barbell",
+    muscles: ["back", "arms"],
+    level: "intermediate",
+    steps: [
+      "Hold the bar with hands just outside your knees and hinge forward with a flat back.",
+      "Pull the bar to your lower ribs, squeezing your shoulder blades together.",
+      "Lower it with control, keeping your torso still.",
+    ],
+    video: "how to do barbell bent over row proper form",
+  },
+  {
+    id: "chest-fly",
+    name: "Machine chest fly",
+    locations: ["gym"],
+    equipment: "Pec deck / fly machine",
+    muscles: ["chest"],
+    level: "beginner",
+    steps: [
+      "Sit with your back against the pad and grip the handles with a slight bend in your elbows.",
+      "Bring the handles together in front of your chest in a wide arc.",
+      "Return slowly until you feel a stretch across your chest.",
+    ],
+    video: "how to use pec deck chest fly machine proper form",
+  },
+  {
+    id: "dips",
+    name: "Dips",
+    locations: ["gym"],
+    equipment: "Dip bars (or assisted machine)",
+    muscles: ["chest", "arms", "shoulders"],
+    level: "intermediate",
+    steps: [
+      "Support yourself on the bars with arms straight.",
+      "Lean slightly forward and lower until your upper arms are about parallel to the floor.",
+      "Press back up until your arms are straight.",
+    ],
+    tip: "Use the assisted dip machine until you can do full reps.",
+    video: "how to do dips proper form beginner",
+  },
+  {
+    id: "hammer-curl",
+    name: "Hammer curl",
+    locations: ["home", "gym"],
+    equipment: "Dumbbells",
+    muscles: ["arms"],
+    level: "beginner",
+    steps: ["Hold dumbbells at your sides with palms facing each other.", "Curl them up without rotating your wrists, then lower slowly."],
+    video: "how to do hammer curls proper form",
+  },
+  {
+    id: "overhead-tricep-ext",
+    name: "Overhead triceps extension",
+    locations: ["home", "gym"],
+    equipment: "Dumbbell",
+    muscles: ["arms"],
+    level: "beginner",
+    steps: [
+      "Hold one dumbbell overhead with both hands, elbows pointing forward.",
+      "Lower it behind your head by bending your elbows.",
+      "Straighten your arms to lift it back up, keeping your elbows in.",
+    ],
+    video: "how to do dumbbell overhead tricep extension proper form",
+  },
+  {
+    id: "russian-twist",
+    name: "Russian twist",
+    locations: ["home", "gym"],
+    equipment: "None (hold a weight to make it harder)",
+    muscles: ["core"],
+    level: "beginner",
+    steps: [
+      "Sit with knees bent, lean back slightly and lift your feet if you can.",
+      "Rotate your torso to touch your hands (or a weight) to the floor beside one hip, then the other.",
+    ],
+    video: "how to do russian twists proper form",
+  },
+  {
+    id: "run",
+    name: "Run / jog",
+    locations: ["home", "gym"],
+    equipment: "None (or treadmill)",
+    muscles: ["cardio", "legs"],
+    level: "beginner",
+    steps: [
+      "Start with 5 minutes of brisk walking.",
+      "Run at a pace where you can still talk in short sentences.",
+      "New to running? Alternate 1 minute of running with 2 minutes of walking.",
+    ],
+    video: "how to start running for beginners proper form",
+  },
+  {
+    id: "walk",
+    name: "Brisk walk",
+    locations: ["home", "gym"],
+    equipment: "None",
+    muscles: ["cardio", "legs"],
+    level: "beginner",
+    steps: ["Walk fast enough that your breathing picks up but you can still hold a conversation.", "Swing your arms and keep an upright posture."],
+    video: "brisk walking for fitness technique",
+  },
+  {
+    id: "bike",
+    name: "Stationary bike",
+    locations: ["gym"],
+    equipment: "Exercise bike",
+    muscles: ["cardio", "legs"],
+    level: "beginner",
+    steps: [
+      "Set the seat so your knee is slightly bent at the bottom of the pedal stroke.",
+      "Pedal at a steady pace with light to moderate resistance.",
+      "For intervals, alternate 1 hard minute with 2 easy minutes.",
+    ],
+    video: "how to use stationary bike setup and workout beginner",
+  },
 ];
 
 export const ROUTINES: Routine[] = [
@@ -749,6 +882,56 @@ export const ROUTINES: Routine[] = [
     ],
   },
   {
+    id: "gym-full-barbell",
+    name: "Full body barbell basics",
+    location: "gym",
+    goals: ["build-muscle", "general"],
+    duration: "45–60 min",
+    frequency: "3 days a week, with a rest day between",
+    description: "The classic big lifts. Start light, keep your form strict, and add a little weight each week.",
+    items: [
+      { id: "back-squat", prescription: "3 sets × 5 reps" },
+      { id: "bench-press", prescription: "3 sets × 5 reps" },
+      { id: "barbell-row", prescription: "3 sets × 5–8 reps" },
+      { id: "overhead-press", prescription: "3 sets × 5–8 reps" },
+      { id: "plank", prescription: "3 × 30–45 seconds" },
+    ],
+  },
+  {
+    id: "gym-upper",
+    name: "Upper body",
+    location: "gym",
+    goals: ["build-muscle"],
+    duration: "50–60 min",
+    frequency: "Twice a week, alternating with Leg day",
+    description: "Chest, back, shoulders and arms in one session.",
+    items: [
+      { id: "bench-press", prescription: "4 sets × 6–8 reps" },
+      { id: "lat-pulldown", prescription: "3 sets × 8–12 reps" },
+      { id: "db-press", prescription: "3 sets × 8–12 reps" },
+      { id: "cable-row", prescription: "3 sets × 8–12 reps" },
+      { id: "db-curl", prescription: "3 sets × 10–12 reps" },
+      { id: "tricep-pushdown", prescription: "3 sets × 10–15 reps" },
+    ],
+  },
+  {
+    id: "gym-arms",
+    name: "Arms & shoulders",
+    location: "gym",
+    goals: ["build-muscle"],
+    duration: "40–45 min",
+    frequency: "Once a week, as an extra day",
+    description: "Shoulders, biceps and triceps. Use weights you can control without swinging.",
+    items: [
+      { id: "db-press", prescription: "3 sets × 8–12 reps" },
+      { id: "lateral-raise", prescription: "3 sets × 12–15 reps" },
+      { id: "db-curl", prescription: "3 sets × 10–12 reps" },
+      { id: "hammer-curl", prescription: "3 sets × 10–12 reps" },
+      { id: "tricep-pushdown", prescription: "3 sets × 10–15 reps" },
+      { id: "overhead-tricep-ext", prescription: "3 sets × 10–12 reps" },
+    ],
+  },
+  {
     id: "gym-cardio",
     name: "Gym fat-burn cardio",
     location: "gym",
@@ -766,3 +949,20 @@ export const ROUTINES: Routine[] = [
 ];
 
 export const exerciseById = new Map(EXERCISES.map((e) => [e.id, e]));
+
+const TIMED_EXERCISES = new Set([
+  "plank", "side-plank", "wall-sit", "jumping-jacks", "high-knees", "mountain-climbers",
+  "incline-walk", "rower", "run", "walk", "bike",
+]);
+
+/** Exercises logged by time (minutes) rather than weight and reps. */
+export function isTimed(exerciseId: string | null | undefined): boolean {
+  return !!exerciseId && TIMED_EXERCISES.has(exerciseId);
+}
+
+/** How many sets a routine's prescription asks for, e.g. "3 sets × 12 reps" → 3, "20 minutes" → 1. */
+export function prescribedSets(prescription: string): number {
+  const match = prescription.match(/^(\d+)\s*(?:sets\s*)?×/);
+  if (match) return Math.min(Number(match[1]), 10);
+  return /minute/.test(prescription) ? 1 : 3;
+}

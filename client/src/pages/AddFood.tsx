@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, MEALS, type FoodEntry, type FoodProduct, type FoodSource, type Meal } from "../api";
+import { ApiError, api, MEALS, type FoodEntry, type FoodProduct, type FoodSource, type Meal } from "../api";
 import { useApp } from "../App";
 import { FoodForm, type FoodDraft } from "../components/FoodForm";
 import { DatePicker, ErrorNote, MacroLine, PageHeader } from "../components/ui";
@@ -67,7 +67,15 @@ export function AddFoodPage() {
         const product = await api.lookupBarcode(code);
         setSelection({ draft: productDraft(product, meal), source: "barcode", product });
       } catch (err) {
-        setError(`${(err as Error).message} (barcode ${code})`);
+        if (err instanceof ApiError && err.status === 404) {
+          setSelection({
+            draft: { ...emptyDraft, barcode: code, meal },
+            source: "manual",
+            note: `That barcode (${code}) isn't in the food database. Enter the details from the label below, or go back and ask Claude.`,
+          });
+        } else {
+          setError(`${(err as Error).message} (barcode ${code})`);
+        }
       } finally {
         setBusy(false);
       }
@@ -150,7 +158,7 @@ export function AddFoodPage() {
       <div className="page">
         <PageHeader title="Add food" />
         <DatePicker />
-        {selection.askedClaude && <p className="note">{selection.note ?? claudeNote}</p>}
+        {(selection.askedClaude || selection.note) && <p className="note">{selection.note ?? claudeNote}</p>}
         <div className="card">
           <FoodForm
             draft={selection.draft}

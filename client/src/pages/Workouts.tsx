@@ -1,5 +1,9 @@
-import { useState } from "react";
-import { PageHeader } from "../components/ui";
+import { useCallback, useEffect, useState } from "react";
+import { api, type Workout } from "../api";
+import { useApp } from "../App";
+import { ErrorNote, PageHeader } from "../components/ui";
+import { WorkoutEditor, WorkoutLog, draftFromRoutine, type WorkoutDraft } from "../components/WorkoutLog";
+import type { Units } from "../health";
 import {
   EXERCISES,
   GOAL_LABELS,
@@ -13,15 +17,83 @@ import {
 } from "../data/workouts";
 import { capitalize } from "../util";
 
+/** The workout being recorded is kept on the device so it survives switching screens or closing the app. */
+function loadDraft(key: string): WorkoutDraft | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as WorkoutDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeDraft(key: string, draft: WorkoutDraft | null) {
+  try {
+    if (draft) localStorage.setItem(key, JSON.stringify(draft));
+    else localStorage.removeItem(key);
+  } catch {
+    // Storage unavailable (private mode): the workout just isn't kept between screens.
+  }
+}
+
 const MUSCLES: Muscle[] = ["full body", "legs", "glutes", "chest", "back", "shoulders", "arms", "core", "cardio"];
 
 export function WorkoutsPage() {
-  const [location, setLocation] = useState<Location>("home");
+  const { user } = useApp();
+  const draftKey = `workoutDraft:${user.id}`;
+  const [draft, setDraftState] = useState<WorkoutDraft | null>(() => loadDraft(draftKey));
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [units, setUnits] = useState<Units>("imperial");
+  const [error, setError] = useState<string | null>(null);
+  const [savedNote, setSavedNote] = useState(false);
+  const [location, setLocation] = useState<Location>("gym");
   const [goal, setGoal] = useState<Goal>("general");
-  const [tab, setTab] = useState<"plans" | "library">("plans");
+  const [tab, setTab] = useState<"log" | "plans" | "library">("log");
   const [openRoutine, setOpenRoutine] = useState<string | null>(null);
   const [muscle, setMuscle] = useState<Muscle | "all">("all");
   const [search, setSearch] = useState("");
+
+  const setDraft = (next: WorkoutDraft | null) => {
+    setDraftState(next);
+    storeDraft(draftKey, next);
+  };
+
+  const load = useCallback(() => {
+    Promise.all([api.workouts(), api.profile()])
+      .then(([w, p]) => {
+        setWorkouts(w);
+        if (p.profile) setUnits(p.profile.units);
+      })
+      .catch((err) => setError(err.message));
+  }, []);
+  useEffect(load, [load]);
+
+  const start = (next: WorkoutDraft) => {
+    setSavedNote(false);
+    setDraft(next);
+    window.scrollTo(0, 0);
+  };
+
+  if (draft) {
+    return (
+      <div className="page">
+        <PageHeader title={draft.id ? "Edit workout" : "Record workout"} />
+        <WorkoutEditor
+          draft={draft}
+          setDraft={setDraft}
+          workouts={workouts}
+          units={units}
+          onDone={(saved) => {
+            setDraft(null);
+            setTab("log");
+            setSavedNote(saved);
+            if (saved) load();
+            window.scrollTo(0, 0);
+          }}
+        />
+      </div>
+    );
+  }
 
   const routines = ROUTINES.filter((r) => r.location === location).sort(
     (a, b) => Number(b.goals.includes(goal)) - Number(a.goals.includes(goal)),
@@ -38,21 +110,35 @@ export function WorkoutsPage() {
       <PageHeader title="Workouts" />
 
       <div className="segmented">
-        <button className={location === "home" ? "selected" : ""} onClick={() => setLocation("home")}>
-          🏠 At home
+        <button className={tab === "log" ? "selected" : ""} onClick={() => setTab("log")}>
+          My log
         </button>
-        <button className={location === "gym" ? "selected" : ""} onClick={() => setLocation("gym")}>
-          🏋️ At the gym
-        </button>
-      </div>
-      <div className="segmented">
         <button className={tab === "plans" ? "selected" : ""} onClick={() => setTab("plans")}>
-          Recommended plans
+          Plans
         </button>
         <button className={tab === "library" ? "selected" : ""} onClick={() => setTab("library")}>
-          Exercise library
+          Exercises
         </button>
       </div>
+      <ErrorNote error={error} />
+
+      {tab === "log" && (
+        <>
+          {savedNote && <p className="success">Workout saved. Nice work! 💪</p>}
+          <WorkoutLog workouts={workouts} units={units} onStart={start} onChanged={load} />
+        </>
+      )}
+
+      {tab !== "log" && (
+        <div className="segmented">
+          <button className={location === "gym" ? "selected" : ""} onClick={() => setLocation("gym")}>
+            🏋️ At the gym
+          </button>
+          <button className={location === "home" ? "selected" : ""} onClick={() => setLocation("home")}>
+            🏠 At home
+          </button>
+        </div>
+      )}
 
       {tab === "plans" && (
         <>
@@ -82,6 +168,9 @@ export function WorkoutsPage() {
                 {open && (
                   <div className="stack">
                     <p>{r.description}</p>
+                    <button className="primary" onClick={() => start(draftFromRoutine(r))}>
+                      Start & record this workout
+                    </button>
                     <ol className="routine-list">
                       {r.items.map((item) => {
                         const ex = exerciseById.get(item.id);

@@ -11,6 +11,7 @@ import { recipesRouter } from "./routes/recipes.js";
 import { lookupRouter } from "./routes/lookup.js";
 import { chatRouter } from "./routes/chat.js";
 import { profileRouter } from "./routes/profile.js";
+import { workoutsRouter } from "./routes/workouts.js";
 
 const app = express();
 // Trust a reverse proxy (e.g. Caddy) on the local/private network so HTTPS cookies work behind it.
@@ -29,6 +30,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/recipes", requireUser, recipesRouter);
 app.use("/api/lookup", requireUser, lookupRouter);
 app.use("/api/chat", requireUser, chatRouter);
+app.use("/api/workouts", requireUser, workoutsRouter);
 app.use("/api", requireUser, profileRouter);
 app.use("/api", requireUser, trackingRouter);
 app.use("/api", (_req, res) => {
