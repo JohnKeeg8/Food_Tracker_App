@@ -5,7 +5,7 @@ import { useApp } from "../App";
 import { FoodForm } from "../components/FoodForm";
 import { DatePicker, ErrorNote, MacroLine, PageHeader, ProgressBar } from "../components/ui";
 import { GOAL_TEXT, dailyTip, mealIdeasPrompt } from "../health";
-import { capitalize, formatWater, getWaterUnit, openClaudeWeb, sum, today, unitToMl } from "../util";
+import { capitalize, formatAmount, formatWater, getWaterUnit, openClaudeWeb, sum, today, unitToMl } from "../util";
 
 export function TodayPage() {
   const { user, date, config } = useApp();
@@ -191,7 +191,7 @@ export function TodayPage() {
                   <li key={f.id} className="entry">
                     <button className="entry-main" onClick={() => setEditing(f)}>
                       <strong>{f.name}</strong>
-                      {f.amount && <span className="muted small"> · {f.amount}</span>}
+                      {formatAmount(f.amount, f.quantity) && <span className="muted small"> · {formatAmount(f.amount, f.quantity)}</span>}
                       <MacroLine {...f} />
                     </button>
                     <button className="icon-button" aria-label={`Remove ${f.name}`} onClick={() => remove(f.id)}>

@@ -294,7 +294,8 @@ export function AddFoodPage() {
                   className="list-item"
                   onClick={() =>
                     setSelection({
-                      draft: { name: f.name, brand: f.brand, barcode: f.barcode, amount: f.amount, calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat, meal },
+                      // Recent foods come back per single serving (e.g. 1 slice), so re-adding starts at one.
+                      draft: { name: f.name, brand: f.brand, barcode: f.barcode, amount: f.amount, quantity: 1, calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat, meal },
                       source: "recent",
                     })
                   }

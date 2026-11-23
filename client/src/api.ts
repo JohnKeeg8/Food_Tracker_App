@@ -32,7 +32,10 @@ export interface FoodEntryInput extends Nutrition {
   name: string;
   brand?: string | null;
   barcode?: string | null;
+  /** The serving size, e.g. "1 slice". */
   amount?: string | null;
+  /** How many servings were eaten. Calories and macros are the totals for all of them. */
+  quantity: number;
   source: FoodSource;
 }
 
@@ -100,10 +103,17 @@ export interface WeightEntry {
   weightKg: number;
 }
 
+/** A drop set: more reps straight after a set, at a lower weight. */
+export interface WorkoutDrop {
+  weightKg: number | null;
+  reps: number | null;
+}
+
 export interface WorkoutSet {
   weightKg: number | null;
   reps: number | null;
   seconds: number | null;
+  drops?: WorkoutDrop[];
 }
 
 export interface WorkoutExercise {

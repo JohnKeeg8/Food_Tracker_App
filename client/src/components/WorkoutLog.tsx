@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { api, type Workout, type WorkoutExercise, type WorkoutInput, type WorkoutSet } from "../api";
+import { api, type Workout, type WorkoutDrop, type WorkoutExercise, type WorkoutInput, type WorkoutSet } from "../api";
 import { EXERCISES, ROUTINES, exerciseById, isTimed, prescribedSets, videoUrl, type Routine } from "../data/workouts";
 import { kgToLb, lbToKg, type Units } from "../health";
 import { formatDateLabel, today } from "../util";
@@ -19,18 +19,24 @@ function formatDuration(seconds: number): string {
   return s ? `${m}:${String(s).padStart(2, "0")} min` : `${m} min`;
 }
 
-function formatSet(s: WorkoutSet, units: Units): string {
-  if (s.seconds != null && s.reps == null && s.weightKg == null) return formatDuration(s.seconds);
+function formatLift(s: { weightKg: number | null; reps: number | null }, units: Units): string {
   if (s.weightKg != null) return `${toDisplay(s.weightKg, units)}×${s.reps ?? "?"}`;
   return `${s.reps ?? 0} reps`;
 }
 
-/** e.g. "3×8 @ 135 lb", "135×8, 135×8, 140×6 lb", "3×12 reps" or "20 min". */
+/** e.g. "135×8", or with drops "135×8 → 95×5 → 65×4". */
+function formatSet(s: WorkoutSet, units: Units): string {
+  if (s.seconds != null && s.reps == null && s.weightKg == null) return formatDuration(s.seconds);
+  return [s, ...(s.drops ?? [])].map((part) => formatLift(part, units)).join(" → ");
+}
+
+/** e.g. "3×8 @ 135 lb", "135×8, 135×8, 140×6 → 95×5 lb", "3×12 reps" or "20 min". */
 export function summarizeSets(sets: WorkoutSet[], units: Units): string {
   if (sets.length === 0) return "";
   const texts = sets.map((s) => formatSet(s, units));
-  const weighted = sets.some((s) => s.weightKg != null);
-  if (sets.length > 1 && texts.every((t) => t === texts[0])) {
+  const weighted = sets.some((s) => s.weightKg != null || (s.drops ?? []).some((d) => d.weightKg != null));
+  const hasDrops = sets.some((s) => (s.drops ?? []).length > 0);
+  if (sets.length > 1 && !hasDrops && texts.every((t) => t === texts[0])) {
     const s = sets[0];
     if (s.weightKg != null) return `${sets.length}×${s.reps ?? "?"} @ ${toDisplay(s.weightKg, units)} ${unitLabel(units)}`;
     if (s.reps != null) return `${sets.length}×${s.reps} reps`;
@@ -41,7 +47,11 @@ export function summarizeSets(sets: WorkoutSet[], units: Units): string {
 
 function workoutSummary(w: Workout, units: Units): string {
   const sets = w.exercises.reduce((n, e) => n + e.sets.length, 0);
-  const volumeKg = w.exercises.reduce((v, e) => v + e.sets.reduce((a, s) => a + (s.weightKg ?? 0) * (s.reps ?? 0), 0), 0);
+  const lifted = (s: { weightKg: number | null; reps: number | null }) => (s.weightKg ?? 0) * (s.reps ?? 0);
+  const volumeKg = w.exercises.reduce(
+    (v, e) => v + e.sets.reduce((a, s) => a + lifted(s) + (s.drops ?? []).reduce((b, d) => b + lifted(d), 0), 0),
+    0,
+  );
   const parts = [`${w.exercises.length} exercise${w.exercises.length === 1 ? "" : "s"}`, `${sets} set${sets === 1 ? "" : "s"}`];
   if (volumeKg > 0) parts.push(`${Math.round(units === "imperial" ? kgToLb(volumeKg) : volumeKg).toLocaleString()} ${unitLabel(units)} lifted`);
   return parts.join(" · ");
@@ -62,11 +72,18 @@ function lastPerformance(workouts: Workout[], ex: { exerciseId: string | null; n
 
 // ---- Draft (the workout being entered; kept as text so half-typed numbers survive) ----
 
+export interface DraftDrop {
+  weight: string;
+  reps: string;
+}
+
 export interface DraftSet {
   weight: string;
   reps: string;
   minutes: string;
   seconds: string;
+  /** Drop sets after this set. Optional because workouts in progress from before drops existed don't have it. */
+  drops?: DraftDrop[];
 }
 
 export interface DraftExercise {
@@ -87,11 +104,26 @@ export interface WorkoutDraft {
   exercises: DraftExercise[];
 }
 
-const blankSet = (): DraftSet => ({ weight: "", reps: "", minutes: "", seconds: "" });
+const blankSet = (): DraftSet => ({ weight: "", reps: "", minutes: "", seconds: "", drops: [] });
+const blankDrop = (): DraftDrop => ({ weight: "", reps: "" });
 const newKey = () => Math.random().toString(36).slice(2);
 
-function draftExercise(exerciseId: string | null, name: string, setCount: number, timed = isTimed(exerciseId)): DraftExercise {
-  return { key: newKey(), exerciseId, name, timed, sets: Array.from({ length: Math.max(1, setCount) }, blankSet) };
+/**
+ * A new exercise with empty sets. With `template` (sets from last time), each set also gets as many empty
+ * drop rows as it had then, so last time's drop numbers show as hints.
+ */
+function draftExercise(
+  exerciseId: string | null,
+  name: string,
+  setCount: number,
+  timed = isTimed(exerciseId),
+  template?: WorkoutSet[],
+): DraftExercise {
+  const sets = Array.from({ length: Math.max(1, setCount) }, (_, i) => ({
+    ...blankSet(),
+    drops: timed ? [] : (template?.[i]?.drops ?? []).map(blankDrop),
+  }));
+  return { key: newKey(), exerciseId, name, timed, sets };
 }
 
 export function emptyDraft(): WorkoutDraft {
@@ -119,7 +151,7 @@ export function draftRepeating(w: Workout): WorkoutDraft {
     date: today(),
     name: w.name,
     notes: "",
-    exercises: w.exercises.map((e) => draftExercise(e.exerciseId, e.name, e.sets.length, isTimedSets(e))),
+    exercises: w.exercises.map((e) => draftExercise(e.exerciseId, e.name, e.sets.length, isTimedSets(e), e.sets)),
   };
 }
 
@@ -139,6 +171,10 @@ export function draftEditing(w: Workout, units: Units): WorkoutDraft {
         reps: s.reps == null ? "" : String(s.reps),
         minutes: s.seconds == null ? "" : String(Math.floor(s.seconds / 60)),
         seconds: s.seconds == null || s.seconds % 60 === 0 ? "" : String(s.seconds % 60),
+        drops: (s.drops ?? []).map((d) => ({
+          weight: d.weightKg == null ? "" : String(toDisplay(d.weightKg, units)),
+          reps: d.reps == null ? "" : String(d.reps),
+        })),
       })),
     })),
   };
@@ -153,18 +189,21 @@ function draftToInput(draft: WorkoutDraft, units: Units): WorkoutInput {
       sets: e.sets.flatMap((s): WorkoutSet[] => {
         if (e.timed) {
           const total = Math.round((Number(s.minutes) || 0) * 60 + (Number(s.seconds) || 0));
-          return total > 0 ? [{ weightKg: null, reps: null, seconds: total }] : [];
+          return total > 0 ? [{ weightKg: null, reps: null, seconds: total, drops: [] }] : [];
         }
-        if (s.weight.trim() === "" && s.reps.trim() === "") return [];
-        const weight = Number(s.weight);
-        const reps = Number(s.reps);
-        return [
-          {
-            weightKg: s.weight.trim() === "" || !(weight >= 0) ? null : toKg(weight, units),
-            reps: s.reps.trim() === "" || !(reps >= 0) ? null : Math.round(reps),
-            seconds: null,
-          },
-        ];
+        const lift = (weightText: string, repsText: string) => {
+          const weight = Number(weightText);
+          const reps = Number(repsText);
+          return {
+            weightKg: weightText.trim() === "" || !(weight >= 0) ? null : toKg(weight, units),
+            reps: repsText.trim() === "" || !(reps >= 0) ? null : Math.round(reps),
+          };
+        };
+        const drops: WorkoutDrop[] = (s.drops ?? [])
+          .filter((d) => d.weight.trim() !== "" || d.reps.trim() !== "")
+          .map((d) => lift(d.weight, d.reps));
+        if (s.weight.trim() === "" && s.reps.trim() === "" && drops.length === 0) return [];
+        return [{ ...lift(s.weight, s.reps), seconds: null, drops }];
       }),
     }))
     .filter((e) => e.name && e.sets.length > 0);
@@ -368,11 +407,13 @@ export function WorkoutEditor({ draft, setDraft, workouts, units, onDone }: Edit
     const last = lastPerformance(workouts, { exerciseId, name }, draft.id);
     const timed = isTimed(exerciseId) || (!!last && last.sets.every((s) => s.seconds != null && s.reps == null && s.weightKg == null));
     const count = last?.sets.length ?? (timed ? 1 : 3);
-    setDraft({ ...draft, exercises: [...draft.exercises, draftExercise(exerciseId, name, count, timed)] });
+    setDraft({ ...draft, exercises: [...draft.exercises, draftExercise(exerciseId, name, count, timed, last?.sets)] });
     setPicking(false);
   };
 
-  const hasContent = draft.exercises.some((e) => e.sets.some((s) => s.weight || s.reps || s.minutes || s.seconds));
+  const hasContent = draft.exercises.some((e) =>
+    e.sets.some((s) => s.weight || s.reps || s.minutes || s.seconds || (s.drops ?? []).some((d) => d.weight || d.reps)),
+  );
 
   const discard = () => {
     if (hasContent && !confirm(draft.id ? "Discard your changes?" : "Discard this workout?")) return;
@@ -465,10 +506,16 @@ function ExerciseEditor({
   onRemove: () => void;
 }) {
   const library = ex.exerciseId ? exerciseById.get(ex.exerciseId) : undefined;
-  const setField = (index: number, field: keyof DraftSet, value: string) =>
+  const setField = (index: number, field: "weight" | "reps" | "minutes" | "seconds", value: string) =>
     onChange((e) => ({ ...e, sets: e.sets.map((s, i) => (i === index ? { ...s, [field]: value } : s)) }));
+  const changeDrops = (index: number, change: (drops: DraftDrop[]) => DraftDrop[]) =>
+    onChange((e) => ({ ...e, sets: e.sets.map((s, i) => (i === index ? { ...s, drops: change(s.drops ?? []) } : s)) }));
+  const setDropField = (index: number, dropIndex: number, field: keyof DraftDrop, value: string) =>
+    changeDrops(index, (drops) => drops.map((d, j) => (j === dropIndex ? { ...d, [field]: value } : d)));
   // Suggest last time's numbers for each set (the final set repeats for any extra ones).
   const hint = (index: number) => last?.sets[Math.min(index, last.sets.length - 1)];
+  // Last time's drop for the same set and position, if there was one.
+  const dropHint = (index: number, dropIndex: number) => last?.sets[index]?.drops?.[dropIndex];
 
   return (
     <section className="card stack">
@@ -498,6 +545,7 @@ function ExerciseEditor({
           </>
         )}
         <span />
+        <span />
         {ex.sets.map((s, i) => {
           const h = hint(i);
           return (
@@ -505,6 +553,15 @@ function ExerciseEditor({
               key={i}
               index={i}
               name={ex.name}
+              drops={ex.timed ? [] : (s.drops ?? []).map((d, j) => {
+                const dh = dropHint(i, j);
+                return {
+                  weight: { value: d.weight, placeholder: dh?.weightKg != null ? String(toDisplay(dh.weightKg, units)) : "–", onChange: (v) => setDropField(i, j, "weight", v) },
+                  reps: { value: d.reps, placeholder: dh?.reps != null ? String(dh.reps) : "0", onChange: (v) => setDropField(i, j, "reps", v) },
+                  onRemove: () => changeDrops(i, (drops) => drops.filter((_, n) => n !== j)),
+                };
+              })}
+              onAddDrop={ex.timed ? undefined : () => changeDrops(i, (drops) => [...drops, blankDrop()])}
               first={
                 ex.timed
                   ? { value: s.minutes, placeholder: h?.seconds != null ? String(Math.floor(h.seconds / 60)) : "0", onChange: (v) => setField(i, "minutes", v) }
@@ -522,9 +579,18 @@ function ExerciseEditor({
         })}
       </div>
 
-      <div className="row space-between">
-        {/* A new set starts with the previous set's numbers, since they usually repeat. */}
-        <button type="button" className="link-button" onClick={() => onChange((e) => ({ ...e, sets: [...e.sets, { ...(e.sets[e.sets.length - 1] ?? blankSet()) }] }))}>
+      <div className="row space-between exercise-actions">
+        {/* A new set starts with the previous set's numbers (drops included), since they usually repeat. */}
+        <button
+          type="button"
+          className="link-button"
+          onClick={() =>
+            onChange((e) => {
+              const previous = e.sets[e.sets.length - 1] ?? blankSet();
+              return { ...e, sets: [...e.sets, { ...previous, drops: (previous.drops ?? []).map((d) => ({ ...d })) }] };
+            })
+          }
+        >
           ＋ Add set
         </button>
         <span className="row exercise-links">
@@ -548,7 +614,32 @@ interface SetField {
   onChange: (value: string) => void;
 }
 
-function SetRow({ index, name, first, second, labels, onRemove }: { index: number; name: string; first: SetField; second: SetField; labels: [string, string]; onRemove?: () => void }) {
+interface DropFields {
+  weight: SetField;
+  reps: SetField;
+  onRemove: () => void;
+}
+
+function SetRow({
+  index,
+  name,
+  first,
+  second,
+  labels,
+  drops,
+  onAddDrop,
+  onRemove,
+}: {
+  index: number;
+  name: string;
+  first: SetField;
+  second: SetField;
+  labels: [string, string];
+  drops: DropFields[];
+  /** Not set for timed exercises, which have no drops. */
+  onAddDrop?: () => void;
+  onRemove?: () => void;
+}) {
   const input = (field: SetField, label: string, decimal: boolean) => (
     <input
       type="number"
@@ -566,6 +657,14 @@ function SetRow({ index, name, first, second, labels, onRemove }: { index: numbe
       <span className="set-number">{index + 1}</span>
       {input(first, labels[0], labels[0] === "weight")}
       {input(second, labels[1], false)}
+      {onAddDrop ? (
+        <button type="button" className="drop-button" aria-label={`Add a drop to set ${index + 1}`} title="Drop set: lower the weight and keep going" onClick={onAddDrop}>
+          <span aria-hidden>↘</span>
+          <span className="drop-button-text"> Drop</span>
+        </button>
+      ) : (
+        <span />
+      )}
       {onRemove ? (
         <button type="button" className="icon-button" aria-label={`Remove set ${index + 1}`} onClick={onRemove}>
           ✕
@@ -573,6 +672,46 @@ function SetRow({ index, name, first, second, labels, onRemove }: { index: numbe
       ) : (
         <span />
       )}
+      {drops.map((d, j) => (
+        <DropRow key={j} setIndex={index} dropIndex={j} name={name} drop={d} />
+      ))}
+    </>
+  );
+}
+
+function DropRow({ setIndex, dropIndex, name, drop }: { setIndex: number; dropIndex: number; name: string; drop: DropFields }) {
+  const label = `${name} set ${setIndex + 1} drop ${dropIndex + 1}`;
+  return (
+    <>
+      <span className="drop-marker" aria-hidden>
+        ↘
+      </span>
+      <input
+        type="number"
+        inputMode="decimal"
+        min="0"
+        step="any"
+        className="drop-input"
+        aria-label={`${label} weight`}
+        value={drop.weight.value}
+        placeholder={drop.weight.placeholder}
+        onChange={(e) => drop.weight.onChange(e.target.value)}
+      />
+      <input
+        type="number"
+        inputMode="numeric"
+        min="0"
+        step="any"
+        className="drop-input"
+        aria-label={`${label} reps`}
+        value={drop.reps.value}
+        placeholder={drop.reps.placeholder}
+        onChange={(e) => drop.reps.onChange(e.target.value)}
+      />
+      <span className="muted small drop-label">drop</span>
+      <button type="button" className="icon-button" aria-label={`Remove ${label}`} onClick={drop.onRemove}>
+        ✕
+      </button>
     </>
   );
 }

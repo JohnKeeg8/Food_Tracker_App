@@ -22,6 +22,16 @@ const workoutSchema = z.object({
               weightKg: z.number().min(0).max(2000).nullish(),
               reps: z.number().int().min(0).max(10000).nullish(),
               seconds: z.number().int().min(0).max(86400).nullish(),
+              // Drop set: after the main set, the weight is lowered and more reps are done without resting.
+              drops: z
+                .array(
+                  z.object({
+                    weightKg: z.number().min(0).max(2000).nullish(),
+                    reps: z.number().int().min(0).max(10000).nullish(),
+                  }),
+                )
+                .max(10)
+                .default([]),
             }),
           )
           .max(50),
@@ -48,14 +58,24 @@ function loadWorkouts(userId: number, where: string, params: (string | number)[]
     "SELECT id, exercise_id AS exerciseId, name FROM workout_exercises WHERE workout_id = ? ORDER BY position",
   );
   const setStmt = db.prepare(
-    "SELECT weight_kg AS weightKg, reps, seconds FROM workout_sets WHERE workout_exercise_id = ? ORDER BY position",
+    "SELECT weight_kg AS weightKg, reps, seconds, is_drop AS isDrop FROM workout_sets WHERE workout_exercise_id = ? ORDER BY position",
   );
+  // Drop rows follow the set they belong to; nest them under it.
+  const groupSets = (rows: { weightKg: number | null; reps: number | null; seconds: number | null; isDrop: number }[]) => {
+    const sets: { weightKg: number | null; reps: number | null; seconds: number | null; drops: { weightKg: number | null; reps: number | null }[] }[] = [];
+    for (const r of rows) {
+      const parent = sets[sets.length - 1];
+      if (r.isDrop && parent) parent.drops.push({ weightKg: r.weightKg, reps: r.reps });
+      else sets.push({ weightKg: r.weightKg, reps: r.reps, seconds: r.seconds, drops: [] });
+    }
+    return sets;
+  };
   return workouts.map((w) => ({
     ...w,
     exercises: (exerciseStmt.all(w.id) as { id: number; exerciseId: string | null; name: string }[]).map((e) => ({
       exerciseId: e.exerciseId,
       name: e.name,
-      sets: setStmt.all(e.id),
+      sets: groupSets(setStmt.all(e.id) as Parameters<typeof groupSets>[0]),
     })),
   }));
 }
@@ -67,13 +87,15 @@ function saveExercises(workoutId: number, exercises: WorkoutInput["exercises"]) 
     "INSERT INTO workout_exercises (workout_id, position, exercise_id, name) VALUES (?, ?, ?, ?)",
   );
   const insertSet = db.prepare(
-    "INSERT INTO workout_sets (workout_exercise_id, position, weight_kg, reps, seconds) VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO workout_sets (workout_exercise_id, position, weight_kg, reps, seconds, is_drop) VALUES (?, ?, ?, ?, ?, ?)",
   );
   exercises.forEach((e, position) => {
     const exerciseRowId = insertExercise.run(workoutId, position, e.exerciseId ?? null, e.name).lastInsertRowid;
-    e.sets.forEach((s, setPosition) =>
-      insertSet.run(exerciseRowId, setPosition, s.weightKg ?? null, s.reps ?? null, s.seconds ?? null),
-    );
+    let setPosition = 0;
+    for (const s of e.sets) {
+      insertSet.run(exerciseRowId, setPosition++, s.weightKg ?? null, s.reps ?? null, s.seconds ?? null, 0);
+      for (const d of s.drops) insertSet.run(exerciseRowId, setPosition++, d.weightKg ?? null, d.reps ?? null, null, 1);
+    }
   });
 }
 

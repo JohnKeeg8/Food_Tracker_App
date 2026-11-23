@@ -1,14 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, MEALS, type FoodProduct, type FoodSource, type Meal, type Nutrition } from "../api";
 import { useApp } from "../App";
-import { capitalize, defaultMeal, parseNutritionText, round, scale } from "../util";
+import { capitalize, defaultMeal, formatAmount, parseNutritionText, quantityText, round, scale } from "../util";
 import { ErrorNote } from "./ui";
 
 export interface FoodDraft extends Nutrition {
   name: string;
   brand?: string | null;
   barcode?: string | null;
+  /** The serving size, e.g. "1 slice". */
   amount?: string | null;
+  /** Servings eaten (default 1). Calories and macros above are the totals for all of them. */
+  quantity?: number;
   meal?: Meal;
 }
 
@@ -28,25 +31,7 @@ interface Props {
 
 type Unit = "serving" | "g";
 
-const PORTIONS: { value: number; label: string }[] = [
-  { value: 0.25, label: "¼" },
-  { value: 0.5, label: "½" },
-  { value: 0.75, label: "¾" },
-  { value: 1, label: "All" },
-  { value: 1.5, label: "1½" },
-  { value: 2, label: "2×" },
-];
-
-const fractionText = (p: number) =>
-  ({ 0.25: "¼", 0.5: "½", 0.75: "¾", 1.5: "1½", 2: "2" } as Record<number, string>)[p] ?? `${round(p * 100)}%`;
-
-/** Describes a portion of the original amount, e.g. "½ of 1 plate" or "1½ × 1 bowl". */
-function portionAmount(baseAmount: string, p: number): string {
-  if (p === 1) return baseAmount;
-  const text = fractionText(p);
-  if (baseAmount) return p < 1 ? `${text} of ${baseAmount}` : `${text} × ${baseAmount}`;
-  return p < 1 ? `${text} portion` : `${text} portions`;
-}
+const PORTIONS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3];
 
 const toValues = (n: Nutrition): Record<keyof Nutrition, string> => ({
   calories: String(round(n.calories)),
@@ -67,17 +52,23 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
   const date = dateOverride ?? app.date;
   const [name, setName] = useState(draft.name);
   const [meal, setMeal] = useState<Meal>(draft.meal ?? defaultMeal());
-  const [amount, setAmount] = useState(draft.amount ?? "");
+  // The serving size ("1 slice") and how many servings were eaten (3) are kept apart, so the entry can
+  // be re-added later per serving. `values` are the totals for all servings; `base` is for one serving.
+  const [serving, setServing] = useState(draft.amount ?? "");
+  const initialQuantity = draft.quantity && draft.quantity > 0 ? draft.quantity : 1;
+  const [servings, setServings] = useState(initialQuantity);
+  const [servingsInput, setServingsInput] = useState(String(round(initialQuantity, 2)));
+  const [pctInput, setPctInput] = useState("");
   const [values, setValues] = useState(() => toValues(draft));
-  // "How much did you eat?": nutrition and amount for the full portion, scaled by `portion`.
-  const [base, setBase] = useState<{ nutrition: Nutrition; amount: string }>({
-    nutrition: { calories: draft.calories, protein: draft.protein, carbs: draft.carbs, fat: draft.fat },
-    amount: draft.amount ?? "",
-  });
-  const [portion, setPortion] = useState(1);
-  const [customPct, setCustomPct] = useState("");
+  // Unrounded, so 3 slices → 1 slice → 3 slices gives back exactly the same totals.
+  const [base, setBase] = useState<Nutrition>(() => ({
+    calories: draft.calories / initialQuantity,
+    protein: draft.protein / initialQuantity,
+    carbs: draft.carbs / initialQuantity,
+    fat: draft.fat / initialQuantity,
+  }));
   const [unit, setUnit] = useState<Unit>(product?.perServing ? "serving" : "g");
-  const [quantity, setQuantity] = useState(product?.perServing ? "1" : "100");
+  const [productAmount, setProductAmount] = useState(product?.perServing ? "1" : "100");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pasteNote, setPasteNote] = useState<string | null>(null);
@@ -96,11 +87,12 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
       fat: pick(parsed.fat, values.fat),
     };
     setValues(toValues(pasted));
-    if (parsed.amount) setAmount(parsed.amount);
-    // Claude's answer is for the whole serving; start portion scaling from there.
-    setBase({ nutrition: pasted, amount: parsed.amount ?? amount });
-    setPortion(1);
-    setCustomPct("");
+    if (parsed.amount) setServing(parsed.amount);
+    // Claude's answer is for one serving; how many were eaten is chosen below.
+    setBase(pasted);
+    setServings(1);
+    setServingsInput("1");
+    setPctInput("");
     // Photo answers name the food; keep a name the user already typed.
     if (parsed.name) setName((current) => (current.trim() ? current : parsed.name!));
     setPasteNote("Filled in from Claude's answer. Check the numbers, then add it.");
@@ -109,16 +101,19 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
   // Recalculate nutrition when the portion of a looked-up product changes.
   useEffect(() => {
     if (!product) return;
-    const q = Number(quantity);
+    const q = Number(productAmount);
     if (!Number.isFinite(q) || q <= 0) return;
     let n: Nutrition | null = null;
     if (unit === "serving") {
       if (product.perServing) n = scale(product.perServing, q);
       else if (product.per100g && product.servingGrams) n = scale(product.per100g, (q * product.servingGrams) / 100);
-      setAmount(`${q} serving${q === 1 ? "" : "s"}${product.servingSize ? ` (${product.servingSize})` : ""}`);
+      // Saved as q × one serving, so "Recent" offers a single serving next time.
+      setServing(product.servingSize || "1 serving");
+      setServings(q);
     } else {
       if (product.per100g) n = scale(product.per100g, q / 100);
-      setAmount(`${q} g`);
+      setServing(`${q} g`);
+      setServings(1);
     }
     if (n) {
       setValues({
@@ -128,24 +123,18 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
         fat: String(n.fat),
       });
     }
-  }, [product, unit, quantity]);
+  }, [product, unit, productAmount]);
 
-  const applyPortion = (p: number) => {
-    if (!(p > 0)) return;
-    setPortion(p);
-    setValues(toValues(scale(base.nutrition, p)));
-    setAmount(portionAmount(base.amount, p));
+  const applyServings = (q: number) => {
+    if (!(q > 0)) return;
+    setServings(q);
+    setValues(toValues(scale(base, q)));
   };
 
   const editValue = (key: keyof Nutrition, value: string) => {
     setValues({ ...values, [key]: value });
-    // Keep the full-portion value in step so changing the portion later scales from the corrected number.
-    setBase((b) => ({ ...b, nutrition: { ...b.nutrition, [key]: (Number(value) || 0) / portion } }));
-  };
-
-  const editAmount = (value: string) => {
-    setAmount(value);
-    if (portion === 1) setBase((b) => ({ ...b, amount: value }));
+    // Keep the one-serving value in step so changing the number of servings scales from the corrected total.
+    setBase((b) => ({ ...b, [key]: (Number(value) || 0) / servings }));
   };
 
   const submit = async (e: FormEvent) => {
@@ -158,7 +147,8 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
       name: name.trim(),
       brand: draft.brand ?? null,
       barcode: draft.barcode ?? null,
-      amount: amount.trim() || null,
+      amount: serving.trim() || null,
+      quantity: servings,
       calories: Number(values.calories) || 0,
       protein: Number(values.protein) || 0,
       carbs: Number(values.carbs) || 0,
@@ -197,7 +187,7 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
         <div className="row">
           <label className="grow">
             Amount
-            <input type="number" inputMode="decimal" min="0" step="any" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            <input type="number" inputMode="decimal" min="0" step="any" value={productAmount} onChange={(e) => setProductAmount(e.target.value)} />
           </label>
           <label className="grow">
             Unit
@@ -212,50 +202,74 @@ export function FoodForm({ draft, source, product, entryId, date: dateOverride, 
       )}
       {!product && (
         <label>
-          Amount / serving <span className="muted small">(optional)</span>
-          <input value={amount} onChange={(e) => editAmount(e.target.value)} placeholder="e.g. 1 cup, 2 slices, 150 g" />
+          Serving size <span className="muted small">(optional)</span>
+          <input value={serving} onChange={(e) => setServing(e.target.value)} placeholder="e.g. 1 slice, 1 cup, 150 g" />
         </label>
       )}
 
       {!product && (
         <div className="portion">
           <span className="portion-title">
-            How much did you eat?{" "}
-            {portion !== 1 && <span className="muted small">({round(portion * 100)}% of the original)</span>}
+            How many servings?{" "}
+            {servings !== 1 && <span className="muted small">({formatAmount(serving, servings)})</span>}
           </span>
-          <div className="segmented portion-buttons" role="radiogroup" aria-label="Portion eaten">
-            {PORTIONS.map((opt) => (
+          <div className="segmented portion-buttons" role="radiogroup" aria-label="Servings eaten">
+            {PORTIONS.map((q) => (
               <button
                 type="button"
-                key={opt.value}
-                className={portion === opt.value ? "selected" : ""}
-                aria-pressed={portion === opt.value}
+                key={q}
+                className={servings === q ? "selected" : ""}
+                aria-pressed={servings === q}
                 onClick={() => {
-                  setCustomPct("");
-                  applyPortion(opt.value);
+                  setServingsInput(String(q));
+                  setPctInput("");
+                  applyServings(q);
                 }}
               >
-                {opt.label}
+                {quantityText(q)}
               </button>
             ))}
           </div>
-          <label className="row portion-custom">
-            <span>Or enter</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              min="1"
-              step="any"
-              placeholder="e.g. 60"
-              value={customPct}
-              onChange={(e) => {
-                setCustomPct(e.target.value);
-                const pct = Number(e.target.value);
-                if (pct > 0) applyPortion(pct / 100);
-              }}
-            />
-            <span>%</span>
-          </label>
+          <div className="row portion-custom">
+            <label className="row portion-field">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="any"
+                aria-label="Number of servings"
+                value={servingsInput}
+                onChange={(e) => {
+                  setServingsInput(e.target.value);
+                  setPctInput("");
+                  applyServings(Number(e.target.value));
+                }}
+              />
+              <span>servings</span>
+            </label>
+            <span className="muted">or</span>
+            <label className="row portion-field">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="any"
+                aria-label="Percent of a serving"
+                placeholder="60"
+                value={pctInput}
+                onChange={(e) => {
+                  setPctInput(e.target.value);
+                  const pct = Number(e.target.value);
+                  if (pct > 0) {
+                    setServingsInput(String(round(pct / 100, 2)));
+                    applyServings(pct / 100);
+                  }
+                }}
+              />
+              <span>%</span>
+            </label>
+          </div>
+          {serving.trim() && <span className="muted small">Calories and macros below are the total for everything you ate.</span>}
         </div>
       )}
 

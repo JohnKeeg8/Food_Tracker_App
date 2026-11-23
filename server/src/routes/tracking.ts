@@ -41,7 +41,7 @@ trackingRouter.put("/goals", (req, res) => {
 
 // ---- Food log ----
 
-const foodSelect = `SELECT id, date, meal, name, brand, barcode, amount, calories, protein_g AS protein,
+const foodSelect = `SELECT id, date, meal, name, brand, barcode, amount, quantity, calories, protein_g AS protein,
   carbs_g AS carbs, fat_g AS fat, source, created_at AS createdAt FROM food_entries`;
 
 export const foodEntrySchema = z.object({
@@ -50,7 +50,10 @@ export const foodEntrySchema = z.object({
   name: z.string().trim().min(1).max(200),
   brand: z.string().trim().max(200).nullish(),
   barcode: z.string().trim().max(64).nullish(),
+  /** The serving size, e.g. "1 slice". */
   amount: z.string().trim().max(100).nullish(),
+  /** How many of those servings were eaten. Calories and macros are the totals for all of them. */
+  quantity: z.coerce.number().positive().max(1000).default(1),
   calories: num,
   protein: num,
   carbs: num,
@@ -61,11 +64,11 @@ export const foodEntrySchema = z.object({
 export function insertFoodEntry(userId: number, e: z.infer<typeof foodEntrySchema>) {
   const result = db
     .prepare(
-      `INSERT INTO food_entries (user_id, date, meal, name, brand, barcode, amount, calories, protein_g, carbs_g, fat_g, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO food_entries (user_id, date, meal, name, brand, barcode, amount, quantity, calories, protein_g, carbs_g, fat_g, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      userId, e.date, e.meal, e.name, e.brand ?? null, e.barcode ?? null, e.amount ?? null,
+      userId, e.date, e.meal, e.name, e.brand ?? null, e.barcode ?? null, e.amount ?? null, e.quantity,
       e.calories, e.protein, e.carbs, e.fat, e.source,
     );
   return db.prepare(`${foodSelect} WHERE id = ?`).get(result.lastInsertRowid);
@@ -81,10 +84,13 @@ trackingRouter.get("/food", (req, res) => {
 });
 
 trackingRouter.get("/food/recent", (req, res) => {
-  // Most recently logged distinct foods, for one-tap re-logging.
+  // Most recently logged distinct foods, for one-tap re-logging. They're returned per single serving
+  // (e.g. 1 slice of pizza even if 3 were logged), so re-adding starts from one serving.
   const rows = db
     .prepare(
-      `${foodSelect} WHERE id IN (
+      `SELECT id, date, meal, name, brand, barcode, amount, 1 AS quantity, calories / quantity AS calories,
+         protein_g / quantity AS protein, carbs_g / quantity AS carbs, fat_g / quantity AS fat, source, created_at AS createdAt
+       FROM food_entries WHERE id IN (
          SELECT MAX(id) FROM food_entries WHERE user_id = ? AND source != 'recipe'
          GROUP BY lower(name), coalesce(amount, '')
        ) ORDER BY id DESC LIMIT 20`,
@@ -111,11 +117,11 @@ trackingRouter.put("/food/:id", (req, res) => {
   const e = parsed.data;
   const result = db
     .prepare(
-      `UPDATE food_entries SET date = ?, meal = ?, name = ?, brand = ?, barcode = ?, amount = ?, calories = ?,
+      `UPDATE food_entries SET date = ?, meal = ?, name = ?, brand = ?, barcode = ?, amount = ?, quantity = ?, calories = ?,
          protein_g = ?, carbs_g = ?, fat_g = ? WHERE id = ? AND user_id = ?`,
     )
     .run(
-      e.date, e.meal, e.name, e.brand ?? null, e.barcode ?? null, e.amount ?? null,
+      e.date, e.meal, e.name, e.brand ?? null, e.barcode ?? null, e.amount ?? null, e.quantity,
       e.calories, e.protein, e.carbs, e.fat, Number(req.params.id), req.userId!,
     );
   if (result.changes === 0) {

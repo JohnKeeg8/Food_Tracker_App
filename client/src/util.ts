@@ -88,6 +88,22 @@ export const mlToUnit = (ml: number, unit: WaterUnit) => round(unit === "oz" ? m
 export const unitToMl = (value: number, unit: WaterUnit) => (unit === "oz" ? value * ML_PER_OZ : value);
 export const formatWater = (ml: number, unit: WaterUnit) => `${mlToUnit(ml, unit)} ${unit}`;
 
+// ---- Servings ----
+
+const FRACTIONS: Record<number, string> = { 0.25: "¼", 0.5: "½", 0.75: "¾", 1.5: "1½" };
+
+/** 0.5 → "½", 3 → "3", 0.6 → "0.6". */
+export const quantityText = (q: number) => FRACTIONS[q] ?? String(round(q, 2));
+
+/** How much of a food was eaten, e.g. "3 × 1 slice", "½ of 1 plate", or "2 servings" when there's no serving size. */
+export function formatAmount(amount: string | null | undefined, quantity = 1): string | null {
+  const serving = amount?.trim() || "";
+  if (quantity === 1) return serving || null;
+  const q = quantityText(quantity);
+  if (!serving) return `${q} ${quantity < 1 ? "serving" : "servings"}`;
+  return quantity < 1 ? `${q} of ${serving}` : `${q} × ${serving}`;
+}
+
 // ---- Claude nutrition block parsing ----
 
 export interface ClaudeNutrition extends Nutrition {

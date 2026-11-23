@@ -173,6 +173,7 @@ recipesRouter.post("/:id/log", (req, res) => {
     meal,
     name: recipe.name,
     amount: `${servings} serving${servings === 1 ? "" : "s"}`,
+    quantity: 1,
     calories: round(recipe.perServing.calories),
     protein: round(recipe.perServing.protein),
     carbs: round(recipe.perServing.carbs),

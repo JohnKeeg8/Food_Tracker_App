@@ -897,15 +897,25 @@ button:disabled {
   gap: 8px;
   font-weight: 400;
 }
-.portion-custom input {
-  width: 90px;
+.portion-custom {
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.portion-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+.portion-field input {
+  width: 72px;
 }
 
 /* ---- Workout log ---- */
 
 .set-grid {
   display: grid;
-  grid-template-columns: 32px 1fr 1fr 40px;
+  grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr) 54px 32px;
   gap: 6px 8px;
   align-items: center;
 }
@@ -970,4 +980,52 @@ button:disabled {
   bottom: calc(var(--tabbar) + env(safe-area-inset-bottom) + 8px);
   background: var(--bg);
   padding: 8px 0;
+}
+
+/* Drop sets: shown under their set, slightly indented and tinted. */
+.drop-button {
+  min-height: 36px;
+  padding: 4px 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+.drop-marker {
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+}
+.drop-input {
+  background: var(--accent-soft);
+  min-height: 38px;
+  padding: 6px 10px;
+}
+.drop-label {
+  text-align: center;
+}
+.exercise-actions {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.set-grid .icon-button {
+  min-width: 32px;
+}
+
+/* Small phones (e.g. iPhone SE): keep weights like 225.5 fully visible. */
+@media (max-width: 359px) {
+  .set-grid {
+    grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 34px 30px;
+    gap: 6px;
+  }
+  .set-grid input {
+    padding: 8px;
+  }
+  .drop-button-text {
+    display: none;
+  }
+  .drop-button {
+    font-size: 1rem;
+  }
 }
