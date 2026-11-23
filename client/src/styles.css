@@ -1029,3 +1029,23 @@ button:disabled {
     font-size: 1rem;
   }
 }
+
+/* Reordering exercises while recording a workout */
+.reorder-buttons {
+  gap: 0;
+  align-items: center;
+  flex-shrink: 0;
+}
+.reorder-buttons .icon-button:disabled {
+  opacity: 0.25;
+}
+.exercise-position {
+  color: var(--muted);
+}
+.exercise-card {
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.exercise-card.moved {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}

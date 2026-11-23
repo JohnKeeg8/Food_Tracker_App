@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api, type Workout, type WorkoutDrop, type WorkoutExercise, type WorkoutInput, type WorkoutSet } from "../api";
 import { EXERCISES, ROUTINES, exerciseById, isTimed, prescribedSets, videoUrl, type Routine } from "../data/workouts";
 import { kgToLb, lbToKg, type Units } from "../health";
@@ -411,6 +411,24 @@ export function WorkoutEditor({ draft, setDraft, workouts, units, onDone }: Edit
     setPicking(false);
   };
 
+  // Reordering: swap with the neighbour, then keep the moved exercise in view and briefly highlight it.
+  // `tick` makes moving the same exercise twice in a row count as a new move.
+  const [moved, setMoved] = useState<{ key: string; tick: number } | null>(null);
+  const moveExercise = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= draft.exercises.length) return;
+    const exercises = [...draft.exercises];
+    [exercises[index], exercises[target]] = [exercises[target], exercises[index]];
+    setDraft({ ...draft, exercises });
+    setMoved((m) => ({ key: exercises[target].key, tick: (m?.tick ?? 0) + 1 }));
+  };
+  useEffect(() => {
+    if (!moved) return;
+    document.getElementById(`exercise-${moved.key}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const timer = setTimeout(() => setMoved(null), 1200);
+    return () => clearTimeout(timer);
+  }, [moved]);
+
   const hasContent = draft.exercises.some((e) =>
     e.sets.some((s) => s.weight || s.reps || s.minutes || s.seconds || (s.drops ?? []).some((d) => d.weight || d.reps)),
   );
@@ -452,13 +470,17 @@ export function WorkoutEditor({ draft, setDraft, workouts, units, onDone }: Edit
         </label>
       </section>
 
-      {draft.exercises.map((ex) => (
+      {draft.exercises.map((ex, i) => (
         <ExerciseEditor
           key={ex.key}
           exercise={ex}
+          position={i + 1}
+          highlighted={moved?.key === ex.key}
           last={lastPerformance(workouts, ex, draft.id)}
           units={units}
           onChange={(change) => updateExercise(ex.key, change)}
+          onMoveUp={i > 0 ? () => moveExercise(i, -1) : undefined}
+          onMoveDown={i < draft.exercises.length - 1 ? () => moveExercise(i, 1) : undefined}
           onRemove={() => setDraft({ ...draft, exercises: draft.exercises.filter((e) => e.key !== ex.key) })}
         />
       ))}
@@ -494,15 +516,27 @@ export function WorkoutEditor({ draft, setDraft, workouts, units, onDone }: Edit
 
 function ExerciseEditor({
   exercise: ex,
+  position,
+  highlighted,
   last,
   units,
   onChange,
+  onMoveUp,
+  onMoveDown,
   onRemove,
 }: {
   exercise: DraftExercise;
+  /** 1-based place in the workout. */
+  position: number;
+  /** Just moved, so briefly highlighted. */
+  highlighted: boolean;
   last: { date: string; sets: WorkoutSet[] } | null;
   units: Units;
   onChange: (change: (e: DraftExercise) => DraftExercise) => void;
+  /** Not set for the first exercise. */
+  onMoveUp?: () => void;
+  /** Not set for the last exercise. */
+  onMoveDown?: () => void;
   onRemove: () => void;
 }) {
   const library = ex.exerciseId ? exerciseById.get(ex.exerciseId) : undefined;
@@ -518,12 +552,22 @@ function ExerciseEditor({
   const dropHint = (index: number, dropIndex: number) => last?.sets[index]?.drops?.[dropIndex];
 
   return (
-    <section className="card stack">
+    <section id={`exercise-${ex.key}`} className={highlighted ? "card stack exercise-card moved" : "card stack exercise-card"}>
       <div className="row space-between exercise-title">
-        <strong className="grow">{ex.name}</strong>
-        <button type="button" className="icon-button" aria-label={`Remove ${ex.name}`} onClick={onRemove}>
-          ✕
-        </button>
+        <strong className="grow">
+          <span className="exercise-position">{position}.</span> {ex.name}
+        </strong>
+        <span className="row reorder-buttons">
+          <button type="button" className="icon-button" aria-label={`Move ${ex.name} up`} disabled={!onMoveUp} onClick={onMoveUp}>
+            ↑
+          </button>
+          <button type="button" className="icon-button" aria-label={`Move ${ex.name} down`} disabled={!onMoveDown} onClick={onMoveDown}>
+            ↓
+          </button>
+          <button type="button" className="icon-button" aria-label={`Remove ${ex.name}`} onClick={onRemove}>
+            ✕
+          </button>
+        </span>
       </div>
       {last && (
         <p className="muted small last-time">
